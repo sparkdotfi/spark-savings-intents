@@ -122,6 +122,28 @@ contract SavingsVaultIntentsFulfillFailureTest is BaseTest {
         savingsVaultIntents.fulfill(address(this), 1);
     }
 
+    function test_fulfill_failure_deadlineExceeded() public {
+        _removeAllBalanceFromVault();
+
+        (uint8 v, bytes32 r, bytes32 s) = _generateSignature();
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault:     address(vault),
+            shares:    userShares,
+            recipient: user,
+            deadline:  block.timestamp + 1,
+            v:         v,
+            r:         r,
+            s:         s
+        });
+
+        vm.warp(block.timestamp + 2);
+
+        vm.expectRevert(abi.encodeWithSelector(SavingsVaultIntents.DeadlineExceeded.selector, address(user), 1, block.timestamp -1));
+        savingsVaultIntents.fulfill(address(user), 1);
+    }
+
 }
 
 contract SavingsVaultIntentsFulfillSuccessTest is BaseTest {
@@ -144,13 +166,13 @@ contract SavingsVaultIntentsFulfillSuccessTest is BaseTest {
             s:         s
         });
 
-        // Deal vault some assets 
+        // Deal vault some assets.
 
         address asset = vault.asset();
 
         deal(asset, address(vault), DEPOSIT_AMOUNT);
 
-        // Fulfill the request
+        // Fulfill the request.
 
         assertEq(IERC20(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT);
         assertEq(IERC20(asset).balanceOf(address(user)),  0);
