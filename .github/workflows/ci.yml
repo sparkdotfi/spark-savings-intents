@@ -19,6 +19,9 @@ jobs:
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
 
+      - name: Run forge install
+        run: forge install
+
       - name: Build contracts
         run: |
           forge --version
@@ -28,6 +31,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
+
+      - name: Run forge install
+        run: FOUNDRY_PROFILE=ci forge install
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
@@ -49,6 +55,9 @@ jobs:
 
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1
+
+      - name: Run forge install
+        run: FOUNDRY_PROFILE=ci forge install
 
       - name: Run coverage
         env:
