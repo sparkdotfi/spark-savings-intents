@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.13;
 
-import "forge-std/Test.sol";
+import { Test } from "../lib/forge-std/src/Test.sol";
 
-import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
-
-import { Ethereum } from "spark-address-registry/Ethereum.sol";
+import { Ethereum } from "../lib/spark-address-registry/src/Ethereum.sol";
 
 import { IERC4626Like, SavingsVaultIntents } from "../src/SavingsVaultIntents.sol";
 
 interface IVaultLike {
     function take(uint256 amount) external;
+}
+
+interface IERC20Like {
+    function approve(address spender, uint256 amount) external returns (bool);
+    function balanceOf(address owner) external view returns (uint256);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
 }
 
 contract BaseTest is Test {
@@ -24,7 +28,7 @@ contract BaseTest is Test {
 
     uint256 public constant DEPOSIT_AMOUNT = 1_000_000e6;
 
-    uint256 userShares;
+    uint256 internal userShares;
 
     function setUp() public virtual {
         vm.createSelectFork(getChain("mainnet").rpcUrl, _getBlock());
@@ -42,7 +46,7 @@ contract BaseTest is Test {
 
         vm.startPrank(user);
 
-        IERC20(vault.asset()).approve(address(vault), DEPOSIT_AMOUNT);
+        IERC20Like(vault.asset()).approve(address(vault), DEPOSIT_AMOUNT);
 
         userShares = vault.deposit(DEPOSIT_AMOUNT, user);
 
@@ -63,7 +67,7 @@ contract BaseTest is Test {
         address asset = vault.asset();
 
         vm.startPrank(Ethereum.ALM_PROXY);
-        IVaultLike(address(vault)).take(IERC20(asset).balanceOf(address(vault)));
+        IVaultLike(address(vault)).take(IERC20Like(asset).balanceOf(address(vault)));
         vm.stopPrank();
     }
 

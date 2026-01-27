@@ -1,42 +1,9 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.13;
 
-import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
-
-import { BaseTest } from "./Base.t.sol";
+import { IERC20Like, BaseTest } from "./Base.t.sol";
 
 import { SavingsVaultIntents } from "../src/SavingsVaultIntents.sol";
-
-contract SavingsVaultIntentsRequestFailureTest is BaseTest {
-
-    function test_request_failure_insufficientBalance() public {
-        vm.expectRevert("Insufficient balance");
-        savingsVaultIntents.request({
-            vault:     address(vault),
-            shares:    100,
-            recipient: address(this),
-            deadline:  block.timestamp + 100,
-            v:         0,
-            r:         0,
-            s:         0
-        });
-    }
-
-    function test_request_failure_assetsAlreadyAvailable() public {
-        vm.expectRevert("Assets already available in vault to redeem");
-        vm.prank(user);
-        savingsVaultIntents.request({
-            vault:     address(vault),
-            shares:    userShares,
-            recipient: user,
-            deadline:  block.timestamp + 100,
-            v:         0,
-            r:         0,
-            s:         0
-        });
-    }
-
-}
 
 contract SavingsVaultIntentsRequestSuccessTest is BaseTest {
 
@@ -56,10 +23,10 @@ contract SavingsVaultIntentsRequestSuccessTest is BaseTest {
 
         (uint8 v, bytes32 r, bytes32 s) = _generateSignature();
 
-        vm.startPrank(user);
-
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit(address(savingsVaultIntents));
         emit Request(address(user), 1, address(vault), userShares, block.timestamp + 100, v, r, s);
+
+        vm.prank(user);
         savingsVaultIntents.request({
             vault:     address(vault),
             shares:    userShares,
@@ -69,8 +36,6 @@ contract SavingsVaultIntentsRequestSuccessTest is BaseTest {
             r:         r,
             s:         s
         });
-
-        vm.stopPrank();
     }
 
 }
@@ -174,8 +139,8 @@ contract SavingsVaultIntentsFulfillSuccessTest is BaseTest {
 
         // Fulfill the request.
 
-        assertEq(IERC20(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT);
-        assertEq(IERC20(asset).balanceOf(address(user)),  0);
+        assertEq(IERC20Like(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT);
+        assertEq(IERC20Like(asset).balanceOf(address(user)),  0);
 
         vm.startPrank(user);
 
@@ -187,8 +152,8 @@ contract SavingsVaultIntentsFulfillSuccessTest is BaseTest {
 
         vm.stopPrank();
 
-        assertEq(IERC20(asset).balanceOf(address(vault)), 1);
-        assertEq(IERC20(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1);
+        assertEq(IERC20Like(asset).balanceOf(address(vault)), 1);
+        assertEq(IERC20Like(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1);
     }
 
 }

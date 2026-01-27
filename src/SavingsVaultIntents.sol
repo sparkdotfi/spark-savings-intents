@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.13;
 
-import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
-
 interface IERC4626Like {
     function approve(address spender, uint256 amount) external returns (bool);
     function asset() external view returns (address);
@@ -66,13 +64,6 @@ contract SavingsVaultIntents {
     ) 
         external returns (uint256 requestId)
     {
-        require(IERC4626Like(vault).balanceOf(msg.sender) >= shares, "Insufficient balance");
-
-        require(
-            IERC20(IERC4626Like(vault).asset()).balanceOf(vault) < IERC4626Like(vault).convertToAssets(shares),
-            "Assets already available in vault to redeem"
-        );
-
         requests[msg.sender][requestId = ++_requestCount] = WithdrawRequest({
             vault:     vault,
             shares:    shares,
@@ -105,7 +96,7 @@ contract SavingsVaultIntents {
 
         // Call permit to approve the transfer
         // Use low-level call to handle case where permit may have already been consumed.
-        (bool success, ) = _request.vault.call(
+        _request.vault.call(
             abi.encodeWithSelector(
                 IERC4626Like.permit.selector,
                 account,
@@ -117,8 +108,6 @@ contract SavingsVaultIntents {
                 _request.s
             )
         );
-        // Ignore failure if permit was already consumed
-        success;
 
         IERC4626Like(_request.vault).transferFrom(account, address(this), _request.shares);
 
