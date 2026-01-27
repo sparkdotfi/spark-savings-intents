@@ -21,7 +21,7 @@ contract SavingsVaultIntentsRequestSuccessTest is BaseTest {
     function test_request() public {
         _removeAllBalanceFromVault();
 
-        (uint8 v, bytes32 r, bytes32 s) = _generateSignature();
+        (uint8 v, bytes32 r, bytes32 s) = _generateSignature(userShares, block.timestamp + 100);
 
         vm.expectEmit(address(savingsVaultIntents));
         emit Request(address(user), 1, address(vault), userShares, block.timestamp + 100, v, r, s);
@@ -56,7 +56,7 @@ contract SavingsVaultIntentsCancelSuccessTest is BaseTest {
     function test_cancel() public {
         _removeAllBalanceFromVault();
 
-        (uint8 v, bytes32 r, bytes32 s) = _generateSignature();
+        (uint8 v, bytes32 r, bytes32 s) = _generateSignature(userShares, block.timestamp + 100);
 
         vm.prank(user);
         savingsVaultIntents.request({
@@ -90,7 +90,7 @@ contract SavingsVaultIntentsFulfillFailureTest is BaseTest {
     function test_fulfill_failure_deadlineExceeded() public {
         _removeAllBalanceFromVault();
 
-        (uint8 v, bytes32 r, bytes32 s) = _generateSignature();
+        (uint8 v, bytes32 r, bytes32 s) = _generateSignature(userShares, block.timestamp + 100);
 
         vm.prank(user);
         savingsVaultIntents.request({
@@ -118,7 +118,7 @@ contract SavingsVaultIntentsFulfillSuccessTest is BaseTest {
     function test_fulfill() public {
         _removeAllBalanceFromVault();
 
-        (uint8 v, bytes32 r, bytes32 s) = _generateSignature();
+        (uint8 v, bytes32 r, bytes32 s) = _generateSignature(userShares, block.timestamp + 100);
 
         vm.prank(user);
         savingsVaultIntents.request({
@@ -142,15 +142,11 @@ contract SavingsVaultIntentsFulfillSuccessTest is BaseTest {
         assertEq(IERC20Like(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT);
         assertEq(IERC20Like(asset).balanceOf(address(user)),  0);
 
-        vm.startPrank(user);
-
-        vault.approve(address(savingsVaultIntents), userShares);
-
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit(address(savingsVaultIntents));
         emit Fulfill(address(user), 1);
-        savingsVaultIntents.fulfill(address(user), 1);
 
-        vm.stopPrank();
+        vm.prank(user);
+        savingsVaultIntents.fulfill(address(user), 1);
 
         assertEq(IERC20Like(asset).balanceOf(address(vault)), 1);
         assertEq(IERC20Like(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1);

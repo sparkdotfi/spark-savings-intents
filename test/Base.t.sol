@@ -17,6 +17,12 @@ interface IERC20Like {
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 }
 
+interface IERC712Like {
+    function nonces(address owner) external view returns (uint256);
+    function DOMAIN_SEPARATOR() external view returns (bytes32);
+    function PERMIT_TYPEHASH() external view returns (bytes32);
+}
+
 contract BaseTest is Test {
 
     SavingsVaultIntents public savingsVaultIntents;
@@ -57,8 +63,15 @@ contract BaseTest is Test {
         return 24319071; //  January 26, 2026
     }
 
-    function _generateSignature() internal virtual returns (uint8 v, bytes32 r, bytes32 s) {
-        bytes32 digest = keccak256(abi.encode(user, block.timestamp));
+    function _generateSignature(
+        uint256 amount_,
+        uint256 deadline_
+    )
+        internal virtual returns (uint8 v, bytes32 r, bytes32 s)
+    {
+        uint256 nonce        = IERC712Like(address(vault)).nonces(user);
+        bytes32 permitDigest = keccak256(abi.encode(IERC712Like(address(vault)).PERMIT_TYPEHASH(), user, address(savingsVaultIntents), amount_, nonce, deadline_));
+        bytes32 digest       = keccak256(abi.encodePacked("\x19\x01", IERC712Like(address(vault)).DOMAIN_SEPARATOR(), permitDigest));
 
         (v, r, s) = vm.sign(userPrivateKey, digest);
     }
