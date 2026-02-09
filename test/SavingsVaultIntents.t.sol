@@ -85,25 +85,75 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         savingsVaultIntents.fulfill(address(this), 1);
     }
 
-    function test_fulfill_deadlineExceededBoundary() public {
+    function test_fulfill_insufficientUserFunds() public {
         _removeAllBalanceFromVault();
 
-        (uint8 v, bytes32 r, bytes32 s) = _generateSignature(userShares, block.timestamp + 100);
+        ( uint8 v, bytes32 r, bytes32 s ) = _generateSignature(userShares, block.timestamp + 100);
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault:     address(vault),
+            shares:    userShares + 1,
+            recipient: user,
+            deadline:  block.timestamp + 100,
+            v:         v,
+            r:         r,
+            s:         s
+        });
+
+        vm.expectRevert("SparkVault/insufficient-balance");
+        savingsVaultIntents.fulfill(user, 1);
+    }
+
+    function test_fulfill_insufficientVaultFunds() public {
+        _removeAllBalanceFromVault();
+
+        ( uint8 v, bytes32 r, bytes32 s ) = _generateSignature(userShares, block.timestamp + 100);
 
         vm.prank(user);
         savingsVaultIntents.request({
             vault:     address(vault),
             shares:    userShares,
             recipient: user,
-            deadline:  block.timestamp + 1,
+            deadline:  block.timestamp + 100,
             v:         v,
             r:         r,
             s:         s
         });
 
-        vm.warp(block.timestamp + 2);
+        vm.expectRevert("SparkVault/insufficient-liquidity");
+        savingsVaultIntents.fulfill(user, 1);
+    }
 
-        vm.expectRevert(abi.encodeWithSelector(SavingsVaultIntents.DeadlineExceeded.selector, user, 1, block.timestamp - 1));
+    function test_fulfill_deadlineExceededBoundary() public {
+        _removeAllBalanceFromVault();
+
+        uint256 deadline = block.timestamp + 1;
+
+        ( uint8 v, bytes32 r, bytes32 s ) = _generateSignature(userShares, deadline);
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault:     address(vault),
+            shares:    userShares,
+            recipient: user,
+            deadline:  deadline,
+            v:         v,
+            r:         r,
+            s:         s
+        });
+
+        vm.warp(deadline + 1);
+
+        vm.expectRevert(abi.encodeWithSelector(SavingsVaultIntents.DeadlineExceeded.selector, user, 1, deadline));
+        savingsVaultIntents.fulfill(user, 1);
+
+        vm.warp(deadline - 1);
+
+        address asset = vault.asset();
+
+        deal(asset, address(vault), DEPOSIT_AMOUNT);
+
         savingsVaultIntents.fulfill(user, 1);
     }
 
@@ -134,6 +184,47 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         assertEq(IERC20Like(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT);
         assertEq(IERC20Like(asset).balanceOf(address(user)),  0);
         assertEq(vault.balanceOf(address(user)),              userShares);
+
+        vm.expectEmit(address(savingsVaultIntents));
+        emit SavingsVaultIntents.Fulfill(address(user), 1);
+
+        vm.prank(user);
+        savingsVaultIntents.fulfill(address(user), 1);
+
+        assertEq(IERC20Like(asset).balanceOf(address(vault)), 1);
+        assertEq(IERC20Like(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1);
+        assertEq(vault.balanceOf(address(user)),              0);
+    }
+
+    function test_fulfill_worksWhenInvalidPermitButApprovalExists() public {
+        _removeAllBalanceFromVault();
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault:     address(vault),
+            shares:    userShares,
+            recipient: user,
+            deadline:  block.timestamp + 100,
+            v:         0,
+            r:         0,
+            s:         0
+        });
+
+        // Deal vault some assets.
+
+        address asset = vault.asset();
+
+        deal(asset, address(vault), DEPOSIT_AMOUNT);
+
+        // Fulfill the request.
+
+        assertEq(IERC20Like(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT);
+        assertEq(IERC20Like(asset).balanceOf(address(user)),  0);
+        assertEq(vault.balanceOf(address(user)),              userShares);
+
+        // Approve the transfer.
+        vm.prank(user);
+        vault.approve(address(savingsVaultIntents), userShares);
 
         vm.expectEmit(address(savingsVaultIntents));
         emit SavingsVaultIntents.Fulfill(address(user), 1);
