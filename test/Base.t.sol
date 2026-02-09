@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.24;
 
 import { Test } from "../lib/forge-std/src/Test.sol";
 
 import { Ethereum } from "../lib/spark-address-registry/src/Ethereum.sol";
 
-import { IERC4626Like, SavingsVaultIntents } from "../src/SavingsVaultIntents.sol";
+import { SavingsVaultIntents } from "../src/SavingsVaultIntents.sol";
 
 interface IVaultLike {
     function take(uint256 amount) external;
@@ -23,17 +23,28 @@ interface IERC712Like {
     function PERMIT_TYPEHASH() external view returns (bytes32);
 }
 
-contract BaseTest is Test {
+interface IERC4626Like {
+    function approve(address spender, uint256 amount) external returns (bool);
+    function asset() external view returns (address);
+    function balanceOf(address owner) external view returns (uint256);
+    function convertToAssets(uint256 shares) external view returns (uint256 assets);
+    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
+    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
+    function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
 
-    SavingsVaultIntents public savingsVaultIntents;
+contract TestBase is Test {
 
-    IERC4626Like public constant vault = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPUSDC);
+    SavingsVaultIntents internal savingsVaultIntents;
 
-    address user;
-    uint256 userPrivateKey;
+    IERC4626Like internal constant vault = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPUSDC);
 
-    uint256 public constant DEPOSIT_AMOUNT = 1_000_000e6;
+    uint256 internal constant DEPOSIT_AMOUNT = 1_000_000e6;
 
+    address internal user;
+
+    uint256 internal userPrivateKey;
     uint256 internal userShares;
 
     function setUp() public virtual {
@@ -73,7 +84,7 @@ contract BaseTest is Test {
         bytes32 permitDigest = keccak256(abi.encode(IERC712Like(address(vault)).PERMIT_TYPEHASH(), user, address(savingsVaultIntents), amount_, nonce, deadline_));
         bytes32 digest       = keccak256(abi.encodePacked("\x19\x01", IERC712Like(address(vault)).DOMAIN_SEPARATOR(), permitDigest));
 
-        (v, r, s) = vm.sign(userPrivateKey, digest);
+        ( v, r, s ) = vm.sign(userPrivateKey, digest);
     }
 
     function _removeAllBalanceFromVault() internal virtual {
