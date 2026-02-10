@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.13;
 
+import { IAccessControl } from "../lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
+
 import { IERC20Like, TestBase } from "./Base.t.sol";
 
 import { SavingsVaultIntents } from "../src/SavingsVaultIntents.sol";
@@ -87,6 +89,46 @@ contract SavingsVaultIntentsRequestTests is TestBase {
         assertEq(v_,         v);
         assertEq(r_,         r);
         assertEq(s_,         s);
+    }
+
+}
+
+contract SetMaxDeadlineTests is TestBase {
+
+    // Failure tests
+
+    function test_setMaxDeadline_noAuth() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                user,
+                savingsVaultIntents.DEFAULT_ADMIN_ROLE()
+            )
+        );
+
+        vm.prank(user);
+        savingsVaultIntents.setMaxDeadline(2 days);
+    }
+    
+    function test_setMaxDeadline_invalidMaxDeadline() external {
+        vm.expectRevert(SavingsVaultIntents.InvalidMaxDeadline.selector);
+
+        vm.prank(admin);
+        savingsVaultIntents.setMaxDeadline(0);
+    }
+
+    // Success tests
+
+    function test_setMaxDeadline() external {
+        assertEq(savingsVaultIntents.maxDeadline(), 1 days);
+
+        vm.expectEmit(address(savingsVaultIntents));
+        emit SavingsVaultIntents.MaxDeadlineUpdated(2 days);
+
+        vm.prank(admin);
+        savingsVaultIntents.setMaxDeadline(2 days);
+
+        assertEq(savingsVaultIntents.maxDeadline(), 2 days);
     }
 
 }
