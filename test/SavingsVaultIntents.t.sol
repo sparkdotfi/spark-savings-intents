@@ -5,7 +5,51 @@ import { IERC20Like, TestBase } from "./Base.t.sol";
 
 import { SavingsVaultIntents } from "../src/SavingsVaultIntents.sol";
 
+contract ConstructorTests is TestBase {
+
+    // Failure tests
+
+    function test_constructor_invalidAdmin() external {
+        vm.expectRevert(SavingsVaultIntents.InvalidAdminAddress.selector);
+        new SavingsVaultIntents(address(0), relayer, 1 days);
+    }
+
+    function test_constructor_invalidRelayer() external {
+        vm.expectRevert(SavingsVaultIntents.InvalidRelayerAddress.selector);
+        new SavingsVaultIntents(admin, address(0), 1 days);
+    }
+
+    function test_constructor_invalidMaxDeadline() external {
+        vm.expectRevert(SavingsVaultIntents.InvalidMaxDeadline.selector);
+        new SavingsVaultIntents(admin, relayer, 0);
+    }
+
+    // Success tests
+
+    function test_constructor() external {
+        assertEq(savingsVaultIntents.hasRole(savingsVaultIntents.DEFAULT_ADMIN_ROLE(), admin),   true);
+        assertEq(savingsVaultIntents.hasRole(savingsVaultIntents.RELAYER(),            relayer), true);
+
+        assertEq(savingsVaultIntents.maxDeadline(), 1 days);
+    }
+}
+
 contract SavingsVaultIntentsRequestTests is TestBase {
+
+    function test_request_invalidVaultAddress() public {
+        vm.expectRevert(SavingsVaultIntents.InvalidVaultAddress.selector);
+        savingsVaultIntents.request(address(0), userShares, user, block.timestamp + 100, 0, 0, 0);
+    }
+
+    function test_request_invalidRecipientAddress() public {
+        vm.expectRevert(SavingsVaultIntents.InvalidRecipientAddress.selector);
+        savingsVaultIntents.request(address(vault), userShares, address(0), block.timestamp + 100, 0, 0, 0);
+    }
+
+    function test_request_invalidDeadline() public {
+        vm.expectRevert(abi.encodeWithSelector(SavingsVaultIntents.InvalidDeadline.selector, 1 days, block.timestamp + 1 days + 1));
+        savingsVaultIntents.request(address(vault), userShares, user, block.timestamp + 1 days + 1, 0, 0, 0);
+    }
 
     function test_request() public {
         ( uint8 v, bytes32 r, bytes32 s ) = _generateSignature(userShares, block.timestamp + 100);
@@ -69,7 +113,7 @@ contract SavingsVaultIntentsCancelTest is TestBase {
         });
 
 
-        vm.expectEmit(true, true, true, true);
+        vm.expectEmit(address(savingsVaultIntents));
         emit SavingsVaultIntents.Cancel(address(user), 1);
 
         vm.prank(user);
@@ -81,47 +125,28 @@ contract SavingsVaultIntentsCancelTest is TestBase {
 contract SavingsVaultIntentsFulfillTest is TestBase {
 
     function test_fulfill_requestNotFound() public {
-        vm.expectRevert(abi.encodeWithSelector(SavingsVaultIntents.RequestNotFound.selector, address(this), 1));
-        savingsVaultIntents.fulfill(address(this), 1);
+        vm.expectRevert(abi.encodeWithSelector(SavingsVaultIntents.RequestNotFound.selector, user, 1));
+        vm.prank(relayer);
+        savingsVaultIntents.fulfill(user, 1);
     }
 
     function test_fulfill_insufficientUserFunds() public {
         _removeAllBalanceFromVault();
 
-        ( uint8 v, bytes32 r, bytes32 s ) = _generateSignature(userShares, block.timestamp + 100);
-
-        vm.prank(user);
-        savingsVaultIntents.request({
-            vault:     address(vault),
-            shares:    userShares + 1,
-            recipient: user,
-            deadline:  block.timestamp + 100,
-            v:         v,
-            r:         r,
-            s:         s
-        });
+        _createRequest(userShares + 1, block.timestamp + 100);
 
         vm.expectRevert("SparkVault/insufficient-balance");
+        vm.prank(relayer);
         savingsVaultIntents.fulfill(user, 1);
     }
 
     function test_fulfill_insufficientVaultFunds() public {
         _removeAllBalanceFromVault();
 
-        ( uint8 v, bytes32 r, bytes32 s ) = _generateSignature(userShares, block.timestamp + 100);
-
-        vm.prank(user);
-        savingsVaultIntents.request({
-            vault:     address(vault),
-            shares:    userShares,
-            recipient: user,
-            deadline:  block.timestamp + 100,
-            v:         v,
-            r:         r,
-            s:         s
-        });
+        _createRequest(userShares, block.timestamp + 100);
 
         vm.expectRevert("SparkVault/insufficient-liquidity");
+        vm.prank(relayer);
         savingsVaultIntents.fulfill(user, 1);
     }
 
@@ -130,22 +155,12 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
 
         uint256 deadline = block.timestamp + 1;
 
-        ( uint8 v, bytes32 r, bytes32 s ) = _generateSignature(userShares, deadline);
-
-        vm.prank(user);
-        savingsVaultIntents.request({
-            vault:     address(vault),
-            shares:    userShares,
-            recipient: user,
-            deadline:  deadline,
-            v:         v,
-            r:         r,
-            s:         s
-        });
+        _createRequest(userShares, deadline);
 
         vm.warp(deadline + 1);
 
         vm.expectRevert(abi.encodeWithSelector(SavingsVaultIntents.DeadlineExceeded.selector, user, 1, deadline));
+        vm.prank(relayer);
         savingsVaultIntents.fulfill(user, 1);
 
         vm.warp(deadline - 1);
@@ -154,24 +169,14 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
 
         deal(asset, address(vault), DEPOSIT_AMOUNT);
 
+        vm.prank(relayer);
         savingsVaultIntents.fulfill(user, 1);
     }
 
     function test_fulfill() public {
         _removeAllBalanceFromVault();
 
-        (uint8 v, bytes32 r, bytes32 s) = _generateSignature(userShares, block.timestamp + 100);
-
-        vm.prank(user);
-        savingsVaultIntents.request({
-            vault:     address(vault),
-            shares:    userShares,
-            recipient: user,
-            deadline:  block.timestamp + 100,
-            v:         v,
-            r:         r,
-            s:         s
-        });
+        _createRequest(userShares, block.timestamp + 100);
 
         // Deal vault some assets.
 
@@ -188,7 +193,7 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         vm.expectEmit(address(savingsVaultIntents));
         emit SavingsVaultIntents.Fulfill(address(user), 1);
 
-        vm.prank(user);
+        vm.prank(relayer);
         savingsVaultIntents.fulfill(address(user), 1);
 
         assertEq(IERC20Like(asset).balanceOf(address(vault)), 1);
@@ -199,16 +204,7 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
     function test_fulfill_worksWhenInvalidPermitButApprovalExists() public {
         _removeAllBalanceFromVault();
 
-        vm.prank(user);
-        savingsVaultIntents.request({
-            vault:     address(vault),
-            shares:    userShares,
-            recipient: user,
-            deadline:  block.timestamp + 100,
-            v:         0,
-            r:         0,
-            s:         0
-        });
+        _createRequest(userShares, block.timestamp + 100);
 
         // Deal vault some assets.
 
@@ -229,12 +225,47 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         vm.expectEmit(address(savingsVaultIntents));
         emit SavingsVaultIntents.Fulfill(address(user), 1);
 
-        vm.prank(user);
+        vm.prank(relayer);
         savingsVaultIntents.fulfill(address(user), 1);
 
         assertEq(IERC20Like(asset).balanceOf(address(vault)), 1);
         assertEq(IERC20Like(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1);
         assertEq(vault.balanceOf(address(user)),              0);
+
+        // Request should be deleted.
+
+        ( 
+            address vault_,
+            uint256 shares_,
+            address recipient_,
+            uint256 deadline_,
+            uint8   v_,
+            bytes32 r_,
+            bytes32 s_ 
+        ) = savingsVaultIntents.requests(user, 1);
+
+        assertEq(vault_,     address(0));
+        assertEq(shares_,    0);
+        assertEq(recipient_, address(0));
+        assertEq(deadline_,  0);
+        assertEq(v_,         0);
+        assertEq(r_,         0);
+        assertEq(s_,         0);
+    }
+
+    function _createRequest(uint256 shares_, uint256 deadline_) internal {
+        ( uint8 v, bytes32 r, bytes32 s ) = _generateSignature(shares_, deadline_);
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault:     address(vault),
+            shares:    shares_,
+            recipient: user,
+            deadline:  deadline_,
+            v:         v,
+            r:         r,
+            s:         s
+        });
     }
 
 }

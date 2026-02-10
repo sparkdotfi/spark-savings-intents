@@ -4,3 +4,6 @@
 [submodule "lib/spark-address-registry"]
 	path = lib/spark-address-registry
 	url = https://github.com/sparkdotfi/spark-address-registry
+[submodule "lib/openzeppelin-contracts"]
+	path = lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts

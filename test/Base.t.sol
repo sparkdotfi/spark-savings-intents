@@ -44,13 +44,16 @@ contract TestBase is Test {
 
     address internal user;
 
+    address internal relayer = makeAddr("relayer");
+    address internal admin   = makeAddr("admin");
+
     uint256 internal userPrivateKey;
     uint256 internal userShares;
 
     function setUp() public virtual {
         vm.createSelectFork(getChain("mainnet").rpcUrl, _getBlock());
 
-        savingsVaultIntents = new SavingsVaultIntents();
+        savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days);
 
         // Derive a key for the user from the standard test mnemonic
         string memory mnemonic = "test test test test test test test test test test test junk";
