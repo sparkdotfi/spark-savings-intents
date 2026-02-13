@@ -1,64 +1,51 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.27;
 
 import { Test } from "../lib/forge-std/src/Test.sol";
 
 import { Ethereum } from "../lib/spark-address-registry/src/Ethereum.sol";
 
-import { SavingsVaultIntents } from "../src/SavingsVaultIntents.sol";
+import { IERC20Like }   from "./interfaces/IERC20Like.sol";
+import { IERC712Like }  from "./interfaces/IERC712Like.sol";
+import { IERC4626Like } from "./interfaces/IERC4626Like.sol";
+import { IVaultLike }   from "./interfaces/IVaultLike.sol";
 
-interface IVaultLike {
-    function take(uint256 amount) external;
-}
-
-interface IERC20Like {
-    function approve(address spender, uint256 amount) external returns (bool);
-    function balanceOf(address owner) external view returns (uint256);
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-}
-
-interface IERC712Like {
-    function nonces(address owner) external view returns (uint256);
-    function DOMAIN_SEPARATOR() external view returns (bytes32);
-    function PERMIT_TYPEHASH() external view returns (bytes32);
-}
-
-interface IERC4626Like {
-    function approve(address spender, uint256 amount) external returns (bool);
-    function asset() external view returns (address);
-    function balanceOf(address owner) external view returns (uint256);
-    function convertToAssets(uint256 shares) external view returns (uint256 assets);
-    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
-    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
-    function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-}
+import { ISavingsVaultIntents } from "../src/interfaces/ISavingsVaultIntents.sol";
+import { SavingsVaultIntents }  from "../src/SavingsVaultIntents.sol";
 
 contract TestBase is Test {
 
-    SavingsVaultIntents internal savingsVaultIntents;
-
     IERC4626Like internal constant vault = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPUSDC);
-
+    
     uint256 internal constant DEPOSIT_AMOUNT = 1_000_000e6;
 
-    address internal user;
+    bytes32 internal defaultAdminRole;
+    bytes32 internal relayerRole;
 
-    address internal relayer = makeAddr("relayer");
-    address internal admin   = makeAddr("admin");
+    address internal admin;
+    address internal relayer;
+    address internal unauthorized;
 
+    address internal user; 
     uint256 internal userPrivateKey;
     uint256 internal userShares;
+    
+
+    SavingsVaultIntents internal savingsVaultIntents;
 
     function setUp() public virtual {
         vm.createSelectFork(getChain("mainnet").rpcUrl, _getBlock());
 
-        savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days);
+        admin        = makeAddr("admin");
+        relayer      = makeAddr("relayer");
+        unauthorized = makeAddr("unauthorized");
 
-        // Derive a key for the user from the standard test mnemonic
-        string memory mnemonic = "test test test test test test test test test test test junk";
-        userPrivateKey = vm.deriveKey(mnemonic, 1);
-        user = vm.addr(userPrivateKey);
+        savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days, 1e6);
+
+        defaultAdminRole = savingsVaultIntents.DEFAULT_ADMIN_ROLE();
+        relayerRole      = savingsVaultIntents.RELAYER();
+
+        ( user, userPrivateKey ) = makeAddrAndKey("user");
 
         // Deal some assets to the user and deposit
 
@@ -83,9 +70,26 @@ contract TestBase is Test {
     )
         internal virtual returns (uint8 v, bytes32 r, bytes32 s)
     {
-        uint256 nonce        = IERC712Like(address(vault)).nonces(user);
-        bytes32 permitDigest = keccak256(abi.encode(IERC712Like(address(vault)).PERMIT_TYPEHASH(), user, address(savingsVaultIntents), amount_, nonce, deadline_));
-        bytes32 digest       = keccak256(abi.encodePacked("\x19\x01", IERC712Like(address(vault)).DOMAIN_SEPARATOR(), permitDigest));
+        uint256 nonce      = IERC712Like(address(vault)).nonces(user);
+        bytes32 permitHash = IERC712Like(address(vault)).PERMIT_TYPEHASH();
+        bytes32 domainSep  = IERC712Like(address(vault)).DOMAIN_SEPARATOR();
+
+        bytes32 digest = keccak256(
+            abi.encodePacked(
+                "\x19\x01",
+                domainSep,
+                keccak256(
+                    abi.encode(
+                        permitHash,
+                        user,
+                        address(savingsVaultIntents),
+                        amount_,
+                        nonce,
+                        deadline_
+                    )
+                )
+            )
+        );
 
         ( v, r, s ) = vm.sign(userPrivateKey, digest);
     }
@@ -98,4 +102,46 @@ contract TestBase is Test {
         vm.stopPrank();
     }
 
+    function _assertRequest(
+        address account,
+        uint256 requestId,
+        address expectedVault,
+        uint256 expectedShares,
+        address expectedRecipient,
+        uint256 expectedDeadline,
+        uint8   expectedV,
+        bytes32 expectedR,
+        bytes32 expectedS
+    ) internal view {
+        ISavingsVaultIntents.WithdrawRequest memory request_ = savingsVaultIntents.getRequest(
+            account,
+            requestId
+        );
+
+        assertEq(request_.vault,     expectedVault);
+        assertEq(request_.shares,    expectedShares);
+        assertEq(request_.recipient, expectedRecipient);
+        assertEq(request_.deadline,  expectedDeadline);
+        assertEq(request_.v,         expectedV);
+        assertEq(request_.r,         expectedR);
+        assertEq(request_.s,         expectedS);
+    }
+
+    function _assertEmptyRequest(
+        address account,
+        uint256 requestId
+    ) internal view {
+        ISavingsVaultIntents.WithdrawRequest memory request_ = savingsVaultIntents.getRequest(
+            account,
+            requestId
+        );
+
+        assertEq(request_.vault,     address(0));
+        assertEq(request_.shares,    0);
+        assertEq(request_.recipient, address(0));
+        assertEq(request_.deadline,  0);
+        assertEq(request_.v,         0);
+        assertEq(request_.r,         0);
+        assertEq(request_.s,         0);
+    }
 }
