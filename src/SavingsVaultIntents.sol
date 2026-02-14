@@ -40,7 +40,6 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
         minIntentShares = minIntentShares_;
     }
 
-
     /**********************************************************************************************/
     /*** Admin functions                                                                        ***/
     /**********************************************************************************************/

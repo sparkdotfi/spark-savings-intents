@@ -35,15 +35,108 @@ contract ConstructorTests is TestBase {
     // Success tests
 
     function test_constructor() external {
-        assertEq(savingsVaultIntents.hasRole(defaultAdminRole, admin),   true);
-        assertEq(savingsVaultIntents.hasRole(relayerRole,      relayer), true);
+        SavingsVaultIntents intentInstance = new SavingsVaultIntents({
+            admin            : makeAddr("admin"),
+            relayer          : makeAddr("relayer"),
+            maxDeadline_     : 1 days,
+            minIntentShares_ : 1e6
+        });
 
-        assertEq(savingsVaultIntents.maxDeadline(),     1 days);
-        assertEq(savingsVaultIntents.minIntentShares(), 1e6);
+        assertEq(intentInstance.hasRole(defaultAdminRole, makeAddr("admin")),   true);
+        assertEq(intentInstance.hasRole(relayerRole,      makeAddr("relayer")), true);
+
+        assertEq(intentInstance.maxDeadline(),     1 days);
+        assertEq(intentInstance.minIntentShares(), 1e6);
     }
 }
 
+contract SetMaxDeadlineTests is TestBase {
+
+    // Failure tests
+
+    function test_setMaxDeadline_noAuth() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                unauthorized,
+                savingsVaultIntents.DEFAULT_ADMIN_ROLE()
+            )
+        );
+
+        vm.prank(unauthorized);
+        savingsVaultIntents.setMaxDeadline(2 days);
+    }
+
+    function test_setMaxDeadline_invalidMaxDeadlineBoundary() external {
+        vm.expectRevert(ISavingsVaultIntents.InvalidMaxDeadline.selector);
+        vm.prank(admin);
+        savingsVaultIntents.setMaxDeadline(0);
+
+        vm.prank(admin);
+        savingsVaultIntents.setMaxDeadline(1);
+    }
+
+    // Success tests
+
+    function test_setMaxDeadline() external {
+        assertEq(savingsVaultIntents.maxDeadline(), 1 days);
+
+        vm.expectEmit(address(savingsVaultIntents));
+        emit ISavingsVaultIntents.MaxDeadlineUpdated(2 days);
+
+        vm.prank(admin);
+        savingsVaultIntents.setMaxDeadline(2 days);
+
+        assertEq(savingsVaultIntents.maxDeadline(), 2 days);
+    }
+
+}
+
+contract SetMinIntentSharesTests is TestBase {
+
+    // Failure tests
+
+    function test_setMinIntentShares_noAuth() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                unauthorized,
+                savingsVaultIntents.DEFAULT_ADMIN_ROLE()
+            )
+        );
+
+        vm.prank(unauthorized);
+        savingsVaultIntents.setMinIntentShares(1e6);
+    }
+
+    function test_setMinIntentShares_invalidMinIntentSharesBoundary() external {
+        vm.expectRevert(ISavingsVaultIntents.InvalidMinIntentShares.selector);
+        vm.prank(admin);
+        savingsVaultIntents.setMinIntentShares(0);
+
+        vm.prank(admin);
+        savingsVaultIntents.setMinIntentShares(1);
+    }
+
+    // Success tests
+
+    function test_setMinIntentShares() external {
+        assertEq(savingsVaultIntents.minIntentShares(), 1e6);
+
+        vm.expectEmit(address(savingsVaultIntents));
+        emit ISavingsVaultIntents.MinIntentSharesUpdated(2e6);
+
+        vm.prank(admin);
+        savingsVaultIntents.setMinIntentShares(2e6);
+
+        assertEq(savingsVaultIntents.minIntentShares(), 2e6);
+    }
+
+}
+
 contract SavingsVaultIntentsRequestTests is TestBase {
+
+    // Failure tests
 
     function test_request_invalidVaultAddress() public {
         vm.expectRevert(ISavingsVaultIntents.InvalidVaultAddress.selector);
@@ -105,7 +198,7 @@ contract SavingsVaultIntentsRequestTests is TestBase {
         });
     }
 
-    function test_request_invalidDeadlineBoundary() public {
+    function test_request_invalidDeadlineBoundary_deadlineTooLow() public {
         uint256 maxDeadline = savingsVaultIntents.maxDeadline();
 
         vm.expectRevert(
@@ -126,6 +219,21 @@ contract SavingsVaultIntentsRequestTests is TestBase {
             r         : 0,
             s         : 0
         });
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(vault),
+            shares    : userShares,
+            recipient : user,
+            deadline  : block.timestamp + 1,
+            v         : 0,
+            r         : 0,
+            s         : 0
+        });
+    }
+
+    function test_request_invalidDeadlineBoundary_deadlineTooHigh() public {
+        uint256 maxDeadline = savingsVaultIntents.maxDeadline();
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -151,24 +259,14 @@ contract SavingsVaultIntentsRequestTests is TestBase {
             vault     : address(vault),
             shares    : userShares,
             recipient : user,
-            deadline  : block.timestamp + 1,
-            v         : 0,
-            r         : 0,
-            s         : 0
-        });
-
-        vm.prank(user);
-        savingsVaultIntents.request({
-            vault     : address(vault),
-            shares    : userShares,
-            recipient : user,
             deadline  : block.timestamp + maxDeadline,
             v         : 0,
             r         : 0,
             s         : 0
         });
-
     }
+
+    // Success tests
 
     function test_request() public {
         _assertEmptyRequest(user, 1);
@@ -215,99 +313,24 @@ contract SavingsVaultIntentsRequestTests is TestBase {
 
 }
 
-contract SetMaxDeadlineTests is TestBase {
-
-    // Failure tests
-
-    function test_setMaxDeadline_noAuth() external {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                savingsVaultIntents.DEFAULT_ADMIN_ROLE()
-            )
-        );
-
-        vm.prank(unauthorized);
-        savingsVaultIntents.setMaxDeadline(2 days);
-    }
-    
-    function test_setMaxDeadline_invalidMaxDeadline() external {
-        vm.expectRevert(ISavingsVaultIntents.InvalidMaxDeadline.selector);
-
-        vm.prank(admin);
-        savingsVaultIntents.setMaxDeadline(0);
-    }
-
-    // Success tests
-
-    function test_setMaxDeadline() external {
-        assertEq(savingsVaultIntents.maxDeadline(), 1 days);
-
-        vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.MaxDeadlineUpdated(2 days);
-
-        vm.prank(admin);
-        savingsVaultIntents.setMaxDeadline(2 days);
-
-        assertEq(savingsVaultIntents.maxDeadline(), 2 days);
-    }
-
-}
-
-contract SetMinIntentSharesTests is TestBase {
-
-    // Failure tests
-
-    function test_setMinIntentShares_noAuth() external {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                savingsVaultIntents.DEFAULT_ADMIN_ROLE()
-            )
-        );
-
-        vm.prank(unauthorized);
-        savingsVaultIntents.setMinIntentShares(1e6);
-    }
-
-    function test_setMinIntentShares_invalidMinIntentShares() external {
-        vm.expectRevert(ISavingsVaultIntents.InvalidMinIntentShares.selector);
-
-        vm.prank(admin);
-        savingsVaultIntents.setMinIntentShares(0);
-    }
-
-    // Success tests
-
-    function test_setMinIntentShares() external {
-        assertEq(savingsVaultIntents.minIntentShares(), 1e6);
-
-        vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.MinIntentSharesUpdated(2e6);
-
-        vm.prank(admin);
-        savingsVaultIntents.setMinIntentShares(2e6);
-
-        assertEq(savingsVaultIntents.minIntentShares(), 2e6);
-    }
-
-}
-
 contract SavingsVaultIntentsCancelTest is TestBase {
+
+    // Failure tests
 
     function test_cancel_requestNotFound() public {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.RequestNotFound.selector,
                 user,
-            1)
+                1
+            )
         );
 
         vm.prank(user);
         savingsVaultIntents.cancel(1);
     }
+
+    // Success tests
 
     function test_cancel() public {
         ( uint8 v, bytes32 r, bytes32 s ) = _generateSignature(userShares, block.timestamp + 100);
@@ -349,6 +372,8 @@ contract SavingsVaultIntentsCancelTest is TestBase {
 
 contract SavingsVaultIntentsFulfillTest is TestBase {
 
+    // Failure tests
+
     function test_fulfill_noAuth() external {
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -384,7 +409,6 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         assertEq(requestId, 1);
 
         vm.expectRevert("SparkVault/insufficient-balance");
-
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, requestId);
 
@@ -396,7 +420,7 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
     }
 
     function test_fulfill_insufficientVaultFundsBoundary() public {
-        uint256 assetsAtBoundary = vault.convertToAssets(userShares); // 999_999_999999
+        uint256 assetsAtBoundary    = vault.convertToAssets(userShares); // 999_999_999999
         uint256 assetsUnderBoundary = vault.convertToAssets(userShares) - 1; // 999_999_999998
 
         _removeAllBalanceFromVault();
@@ -405,7 +429,6 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         
         // Vault have zero assets to redeem userShares
         vm.expectRevert("SparkVault/insufficient-liquidity");
-        
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, requestId);
 
@@ -413,7 +436,6 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         deal(vault.asset(), address(vault), assetsUnderBoundary);
         
         vm.expectRevert("SparkVault/insufficient-liquidity");
-
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, requestId);
 
@@ -455,8 +477,12 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         savingsVaultIntents.fulfill(user, requestId);
     }
 
+    // Success tests
+
     function test_fulfill() public {
         _removeAllBalanceFromVault();
+
+        uint256 vaultInitialTotalSupply = vault.totalSupply();
 
         uint256 requestId = _createRequest(userShares, block.timestamp + 100);
 
@@ -473,6 +499,7 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         assertEq(IERC20Like(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT);
         assertEq(IERC20Like(asset).balanceOf(address(user)),  0);
         assertEq(vault.balanceOf(address(user)),              userShares);
+        assertEq(vault.totalSupply(),                         vaultInitialTotalSupply);
 
         vm.expectEmit(address(savingsVaultIntents));
         emit ISavingsVaultIntents.RequestFulfilled(address(user), requestId);
@@ -481,14 +508,17 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         savingsVaultIntents.fulfill(address(user), requestId);
 
         assertEq(IERC20Like(asset).balanceOf(address(vault)), 1);
-        assertEq(IERC20Like(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1);
+        assertEq(IERC20Like(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1); // Rounding
         assertEq(vault.balanceOf(address(user)),              0);
+        assertEq(vault.totalSupply(),                         vaultInitialTotalSupply - userShares);
 
         _assertEmptyRequest(user, requestId);
     }
 
     function test_fulfill_worksWhenInvalidPermitButApprovalExists() public {
         _removeAllBalanceFromVault();
+
+        uint256 vaultInitialTotalSupply = vault.totalSupply();
 
         uint256 requestId = _createRequest(userShares, block.timestamp + 100);
 
@@ -505,6 +535,7 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         assertEq(IERC20Like(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT);
         assertEq(IERC20Like(asset).balanceOf(address(user)),  0);
         assertEq(vault.balanceOf(address(user)),              userShares);
+        assertEq(vault.totalSupply(),                         vaultInitialTotalSupply);
 
         // Approve the transfer.
         vm.prank(user);
@@ -517,12 +548,15 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         savingsVaultIntents.fulfill(address(user), requestId);
 
         assertEq(IERC20Like(asset).balanceOf(address(vault)), 1);
-        assertEq(IERC20Like(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1);
+        assertEq(IERC20Like(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1); // Rounding
         assertEq(vault.balanceOf(address(user)),              0);
+        assertEq(vault.totalSupply(),                         vaultInitialTotalSupply - userShares);
 
         // Request should be deleted.
         _assertEmptyRequest(user, requestId);
     }
+
+    // Helper functions
 
     function _createRequest(uint256 shares_, uint256 deadline_)
         internal 

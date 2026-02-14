@@ -30,7 +30,7 @@ interface ISavingsVaultIntents {
     error InvalidVaultAddress();
 
     error InvalidRecipientAddress();
-    
+
     error InvalidMinIntentShares();
 
     error InvalidDeadline(uint256 maxDeadline, uint256 deadline);
@@ -38,7 +38,7 @@ interface ISavingsVaultIntents {
     error InvalidIntentShares(uint256 minShares, uint256 shares);
 
     error DeadlineExceeded(address account, uint256 requestId, uint256 deadline);
-    
+
     error RequestNotFound(address account, uint256 requestId);
 
     /**********************************************************************************************/
@@ -67,7 +67,7 @@ interface ISavingsVaultIntents {
     /**********************************************************************************************/
     /*** Admin functions                                                                        ***/
     /**********************************************************************************************/
-    
+
     function setMaxDeadline(uint256 maxDeadline_) external;
 
     function setMinIntentShares(uint256 minIntentShares_) external;
@@ -98,4 +98,5 @@ interface ISavingsVaultIntents {
         external
         view 
         returns (WithdrawRequest memory);
+
 }

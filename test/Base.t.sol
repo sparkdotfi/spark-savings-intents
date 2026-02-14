@@ -26,11 +26,10 @@ contract TestBase is Test {
     address internal relayer;
     address internal unauthorized;
 
-    address internal user; 
+    address internal user;
     uint256 internal userPrivateKey;
     uint256 internal userShares;
     
-
     SavingsVaultIntents internal savingsVaultIntents;
 
     function setUp() public virtual {
@@ -112,7 +111,9 @@ contract TestBase is Test {
         uint8   expectedV,
         bytes32 expectedR,
         bytes32 expectedS
-    ) internal view {
+    )
+        internal view
+    {
         ISavingsVaultIntents.WithdrawRequest memory request_ = savingsVaultIntents.getRequest(
             account,
             requestId
@@ -127,21 +128,18 @@ contract TestBase is Test {
         assertEq(request_.s,         expectedS);
     }
 
-    function _assertEmptyRequest(
-        address account,
-        uint256 requestId
-    ) internal view {
-        ISavingsVaultIntents.WithdrawRequest memory request_ = savingsVaultIntents.getRequest(
-            account,
-            requestId
-        );
-
-        assertEq(request_.vault,     address(0));
-        assertEq(request_.shares,    0);
-        assertEq(request_.recipient, address(0));
-        assertEq(request_.deadline,  0);
-        assertEq(request_.v,         0);
-        assertEq(request_.r,         0);
-        assertEq(request_.s,         0);
+    function _assertEmptyRequest(address account, uint256 requestId) internal view {
+        _assertRequest({
+            account           : account,
+            requestId         : requestId,
+            expectedVault     : address(0),
+            expectedShares    : 0,
+            expectedRecipient : address(0),
+            expectedDeadline  : 0,
+            expectedV         : 0,
+            expectedR         : 0,
+            expectedS         : 0
+        });
     }
+
 }
