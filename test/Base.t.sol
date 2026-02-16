@@ -15,9 +15,11 @@ import { SavingsVaultIntents }  from "../src/SavingsVaultIntents.sol";
 
 contract TestBase is Test {
 
-    IERC4626Like internal constant vault = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPUSDC);
-    
     uint256 internal constant DEPOSIT_AMOUNT = 1_000_000e6;
+
+    IERC4626Like internal vault;
+    IERC20Like   internal underlyingAsset;
+    uint256      internal vaultInitialTotalSupply;
 
     bytes32 internal defaultAdminRole;
     bytes32 internal relayerRole;
@@ -29,11 +31,14 @@ contract TestBase is Test {
     address internal user;
     uint256 internal userPrivateKey;
     uint256 internal userShares;
-    
+
     SavingsVaultIntents internal savingsVaultIntents;
 
     function setUp() public virtual {
         vm.createSelectFork(getChain("mainnet").rpcUrl, _getBlock());
+
+        vault           = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPUSDC);
+        underlyingAsset = IERC20Like(vault.asset());
 
         admin        = makeAddr("admin");
         relayer      = makeAddr("relayer");
@@ -48,15 +53,18 @@ contract TestBase is Test {
 
         // Deal some assets to the user and deposit
 
-        deal(vault.asset(), user, DEPOSIT_AMOUNT);
+        deal(address(underlyingAsset), user, DEPOSIT_AMOUNT);
 
         vm.startPrank(user);
 
-        IERC20Like(vault.asset()).approve(address(vault), DEPOSIT_AMOUNT);
+        underlyingAsset.approve(address(vault), DEPOSIT_AMOUNT);
 
         userShares = vault.deposit(DEPOSIT_AMOUNT, user);
 
         vm.stopPrank();
+
+        // Vault totalSupply at _getBlock() + above user deposit
+        vaultInitialTotalSupply = vault.totalSupply();
     }
 
     function _getBlock() internal virtual pure returns (uint256) {
@@ -93,12 +101,15 @@ contract TestBase is Test {
         ( v, r, s ) = vm.sign(userPrivateKey, digest);
     }
 
-    function _removeAllBalanceFromVault() internal virtual {
-        address asset = vault.asset();
+    function _drainVaultBalance() internal virtual {
+        uint256 vaultBalance = underlyingAsset.balanceOf(address(vault));
 
-        vm.startPrank(Ethereum.ALM_PROXY);
-        IVaultLike(address(vault)).take(IERC20Like(asset).balanceOf(address(vault)));
-        vm.stopPrank();
+        vm.prank(Ethereum.ALM_PROXY);
+        IVaultLike(address(vault)).take(vaultBalance);
+    }
+
+    function _fundVaultBalance(uint256 amount_) internal {
+        deal(address(underlyingAsset), address(vault), amount_);
     }
 
     function _assertRequest(

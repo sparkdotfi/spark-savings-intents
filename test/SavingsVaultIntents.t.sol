@@ -401,11 +401,12 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
     }
 
     function test_fulfill_insufficientUserFundsBoundary() public {
-        _removeAllBalanceFromVault();
+        _drainVaultBalance();
 
-        deal(vault.asset(), address(vault), DEPOSIT_AMOUNT);
+        _fundVaultBalance(DEPOSIT_AMOUNT);
         
         uint256 requestId = _createRequest(userShares + 1, block.timestamp + 100);
+
         assertEq(requestId, 1);
 
         vm.expectRevert("SparkVault/insufficient-balance");
@@ -413,6 +414,7 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         savingsVaultIntents.fulfill(user, requestId);
 
         requestId = _createRequest(userShares, block.timestamp + 100);
+
         assertEq(requestId, 2);
 
         vm.prank(relayer);
@@ -423,7 +425,7 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         uint256 assetsAtBoundary    = vault.convertToAssets(userShares); // 999_999_999999
         uint256 assetsUnderBoundary = vault.convertToAssets(userShares) - 1; // 999_999_999998
 
-        _removeAllBalanceFromVault();
+        _drainVaultBalance();
 
         uint256 requestId = _createRequest(userShares, block.timestamp + 100);
         
@@ -433,21 +435,21 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         savingsVaultIntents.fulfill(user, requestId);
 
         // Vault have one less than the amount of assets required to redeem userShares
-        deal(vault.asset(), address(vault), assetsUnderBoundary);
+        _fundVaultBalance(assetsUnderBoundary);
         
         vm.expectRevert("SparkVault/insufficient-liquidity");
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, requestId);
 
         // Vault have exact amount of assets required to redeem
-        deal(vault.asset(), address(vault), assetsAtBoundary);
+        _fundVaultBalance(assetsAtBoundary);
 
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, requestId);
     }
 
     function test_fulfill_deadlineExceededBoundary() public {
-        _removeAllBalanceFromVault();
+        _drainVaultBalance();
 
         uint256 deadline = block.timestamp + 10;
 
@@ -471,7 +473,7 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
 
         vm.warp(deadline);
 
-        deal(vault.asset(), address(vault), vault.convertToAssets(userShares));
+        _fundVaultBalance(vault.convertToAssets(userShares));
 
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, requestId);
@@ -480,26 +482,20 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
     // Success tests
 
     function test_fulfill() public {
-        _removeAllBalanceFromVault();
-
-        uint256 vaultInitialTotalSupply = vault.totalSupply();
+        _drainVaultBalance();
 
         uint256 requestId = _createRequest(userShares, block.timestamp + 100);
 
         assertEq(requestId, 1);
 
-        // Deal vault some assets.
-
-        address asset = vault.asset();
-
-        deal(asset, address(vault), DEPOSIT_AMOUNT);
+        _fundVaultBalance(DEPOSIT_AMOUNT);
 
         // Fulfill the request.
 
-        assertEq(IERC20Like(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT);
-        assertEq(IERC20Like(asset).balanceOf(address(user)),  0);
-        assertEq(vault.balanceOf(address(user)),              userShares);
-        assertEq(vault.totalSupply(),                         vaultInitialTotalSupply);
+        assertEq(underlyingAsset.balanceOf(address(vault)), DEPOSIT_AMOUNT);
+        assertEq(underlyingAsset.balanceOf(address(user)),  0);
+        assertEq(vault.balanceOf(address(user)),            userShares);
+        assertEq(vault.totalSupply(),                       vaultInitialTotalSupply);
 
         vm.expectEmit(address(savingsVaultIntents));
         emit ISavingsVaultIntents.RequestFulfilled(address(user), requestId);
@@ -507,35 +503,29 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         vm.prank(relayer);
         savingsVaultIntents.fulfill(address(user), requestId);
 
-        assertEq(IERC20Like(asset).balanceOf(address(vault)), 1);
-        assertEq(IERC20Like(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1); // Rounding
-        assertEq(vault.balanceOf(address(user)),              0);
-        assertEq(vault.totalSupply(),                         vaultInitialTotalSupply - userShares);
+        assertEq(underlyingAsset.balanceOf(address(vault)), 1);
+        assertEq(underlyingAsset.balanceOf(address(user)),  DEPOSIT_AMOUNT - 1); // Rounding
+        assertEq(vault.balanceOf(address(user)),            0);
+        assertEq(vault.totalSupply(),                       vaultInitialTotalSupply - userShares);
 
         _assertEmptyRequest(user, requestId);
     }
 
     function test_fulfill_worksWhenInvalidPermitButApprovalExists() public {
-        _removeAllBalanceFromVault();
-
-        uint256 vaultInitialTotalSupply = vault.totalSupply();
+        _drainVaultBalance();
 
         uint256 requestId = _createRequest(userShares, block.timestamp + 100);
 
         assertEq(requestId, 1);
 
-        // Deal vault some assets.
-
-        address asset = vault.asset();
-
-        deal(asset, address(vault), DEPOSIT_AMOUNT);
+        _fundVaultBalance(DEPOSIT_AMOUNT);
 
         // Fulfill the request.
 
-        assertEq(IERC20Like(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT);
-        assertEq(IERC20Like(asset).balanceOf(address(user)),  0);
-        assertEq(vault.balanceOf(address(user)),              userShares);
-        assertEq(vault.totalSupply(),                         vaultInitialTotalSupply);
+        assertEq(underlyingAsset.balanceOf(address(vault)), DEPOSIT_AMOUNT);
+        assertEq(underlyingAsset.balanceOf(address(user)),  0);
+        assertEq(vault.balanceOf(address(user)),            userShares);
+        assertEq(vault.totalSupply(),                       vaultInitialTotalSupply);
 
         // Approve the transfer.
         vm.prank(user);
@@ -547,10 +537,10 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         vm.prank(relayer);
         savingsVaultIntents.fulfill(address(user), requestId);
 
-        assertEq(IERC20Like(asset).balanceOf(address(vault)), 1);
-        assertEq(IERC20Like(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1); // Rounding
-        assertEq(vault.balanceOf(address(user)),              0);
-        assertEq(vault.totalSupply(),                         vaultInitialTotalSupply - userShares);
+        assertEq(underlyingAsset.balanceOf(address(vault)), 1);
+        assertEq(underlyingAsset.balanceOf(address(user)),  DEPOSIT_AMOUNT - 1); // Rounding
+        assertEq(vault.balanceOf(address(user)),            0);
+        assertEq(vault.totalSupply(),                       vaultInitialTotalSupply - userShares);
 
         // Request should be deleted.
         _assertEmptyRequest(user, requestId);
