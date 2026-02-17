@@ -8,6 +8,7 @@ interface ISavingsVaultIntents {
     /**********************************************************************************************/
 
     struct WithdrawRequest {
+        uint256 requestId;
         address vault;
         uint256 shares;
         address recipient;
@@ -29,17 +30,23 @@ interface ISavingsVaultIntents {
 
     error InvalidVaultAddress();
 
+    error VaultNotWhitelisted();
+
     error InvalidRecipientAddress();
 
     error InvalidMinIntentShares();
+
+    error ActiveRequestExists();
 
     error InvalidDeadline(uint256 maxDeadline, uint256 deadline);
 
     error InvalidIntentShares(uint256 minShares, uint256 shares);
 
+    error InsufficientShares(uint256 sharesRequested, uint256 sharesPresent);
+
     error DeadlineExceeded(address account, uint256 requestId, uint256 deadline);
 
-    error RequestNotFound(address account, uint256 requestId);
+    error RequestNotFound(address account);
 
     /**********************************************************************************************/
     /*** Events                                                                                 ***/
@@ -64,6 +71,8 @@ interface ISavingsVaultIntents {
 
     event MinIntentSharesUpdated(uint256 indexed minIntentShares);
 
+    event WhitelistUpdated(address indexed vault, bool indexed enabled);
+
     /**********************************************************************************************/
     /*** Admin functions                                                                        ***/
     /**********************************************************************************************/
@@ -71,6 +80,8 @@ interface ISavingsVaultIntents {
     function setMaxDeadline(uint256 maxDeadline_) external;
 
     function setMinIntentShares(uint256 minIntentShares_) external;
+
+    function updateWhitelist(address vault, bool enabled) external;
 
     /**********************************************************************************************/
     /*** External functions                                                                     ***/
@@ -86,7 +97,7 @@ interface ISavingsVaultIntents {
         bytes32 s
     ) external returns (uint256 requestId);
 
-    function cancel(uint256 requestId) external;
+    function cancel() external;
 
     function fulfill(address account, uint256 requestId) external;
 
@@ -94,9 +105,11 @@ interface ISavingsVaultIntents {
     /*** View functions                                                                         ***/
     /**********************************************************************************************/
 
-    function getRequest(address account, uint256 requestId) 
+    function getRequest(address account) 
         external
         view 
         returns (WithdrawRequest memory);
+
+    function isRegistered(address vault) external view returns (bool);
 
 }

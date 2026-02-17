@@ -46,22 +46,16 @@ contract TestBase is Test {
 
         savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days, 1e6);
 
+        // Whitelist vault
+        _whitelistVault(address(vault), true);
+
         defaultAdminRole = savingsVaultIntents.DEFAULT_ADMIN_ROLE();
         relayerRole      = savingsVaultIntents.RELAYER();
 
         ( user, userPrivateKey ) = makeAddrAndKey("user");
 
         // Deal some assets to the user and deposit
-
-        deal(address(underlyingAsset), user, DEPOSIT_AMOUNT);
-
-        vm.startPrank(user);
-
-        underlyingAsset.approve(address(vault), DEPOSIT_AMOUNT);
-
-        userShares = vault.deposit(DEPOSIT_AMOUNT, user);
-
-        vm.stopPrank();
+        userShares = _depositToVault(user, DEPOSIT_AMOUNT);
 
         // Vault totalSupply at _getBlock() + above user deposit
         vaultInitialTotalSupply = vault.totalSupply();
@@ -112,9 +106,24 @@ contract TestBase is Test {
         deal(address(underlyingAsset), address(vault), amount_);
     }
 
+    function _whitelistVault(address vault_, bool enable) internal {
+        vm.prank(admin);
+        savingsVaultIntents.updateWhitelist(vault_, enable);
+    }
+
+    function _depositToVault(address account, uint256 assets) internal returns (uint256 shares) {
+        deal(address(underlyingAsset), account, assets);
+
+        vm.prank(account);
+        underlyingAsset.approve(address(vault), assets);
+
+        vm.prank(account);
+        shares = vault.deposit(assets, account);
+    }
+
     function _assertRequest(
         address account,
-        uint256 requestId,
+        uint256 expectedRequestId,
         address expectedVault,
         uint256 expectedShares,
         address expectedRecipient,
@@ -126,10 +135,10 @@ contract TestBase is Test {
         internal view
     {
         ISavingsVaultIntents.WithdrawRequest memory request_ = savingsVaultIntents.getRequest(
-            account,
-            requestId
+            account
         );
 
+        assertEq(request_.requestId, expectedRequestId);
         assertEq(request_.vault,     expectedVault);
         assertEq(request_.shares,    expectedShares);
         assertEq(request_.recipient, expectedRecipient);
@@ -139,10 +148,10 @@ contract TestBase is Test {
         assertEq(request_.s,         expectedS);
     }
 
-    function _assertEmptyRequest(address account, uint256 requestId) internal view {
+    function _assertEmptyRequest(address account) internal view {
         _assertRequest({
             account           : account,
-            requestId         : requestId,
+            expectedRequestId : 0,
             expectedVault     : address(0),
             expectedShares    : 0,
             expectedRecipient : address(0),

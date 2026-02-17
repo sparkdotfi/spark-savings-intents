@@ -134,12 +134,74 @@ contract SetMinIntentSharesTests is TestBase {
 
 }
 
+contract UpdateWhitelistTests is TestBase {
+
+    // Failure tests
+
+    function test_updateWhitelist_noAuth() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                unauthorized,
+                savingsVaultIntents.DEFAULT_ADMIN_ROLE()
+            )
+        );
+
+        vm.prank(unauthorized);
+        savingsVaultIntents.updateWhitelist(makeAddr("vault"), true);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                unauthorized,
+                savingsVaultIntents.DEFAULT_ADMIN_ROLE()
+            )
+        );
+
+        vm.prank(unauthorized);
+        savingsVaultIntents.updateWhitelist(address(vault), false);
+    }
+
+    function test_updateWhitelist_invalidVaultAddress() external {
+        vm.expectRevert(ISavingsVaultIntents.InvalidVaultAddress.selector);
+        vm.prank(admin);
+        savingsVaultIntents.updateWhitelist(address(0), true);
+
+        vm.expectRevert(ISavingsVaultIntents.InvalidVaultAddress.selector);
+        vm.prank(admin);
+        savingsVaultIntents.updateWhitelist(address(0), false);
+    }
+
+    // Success tests
+
+    function test_updateWhitelist() external {
+        assertEq(savingsVaultIntents.isRegistered(address(vault)),       true);
+        assertEq(savingsVaultIntents.isRegistered(makeAddr("newVault")), false);
+
+        vm.expectEmit(address(savingsVaultIntents));
+        emit ISavingsVaultIntents.WhitelistUpdated(address(vault), false);
+
+        vm.prank(admin);
+        savingsVaultIntents.updateWhitelist(address(vault), false);
+
+        vm.expectEmit(address(savingsVaultIntents));
+        emit ISavingsVaultIntents.WhitelistUpdated(makeAddr("newVault"), true);
+
+        vm.prank(admin);
+        savingsVaultIntents.updateWhitelist(makeAddr("newVault"), true);
+
+        assertEq(savingsVaultIntents.isRegistered(address(vault)),       false);
+        assertEq(savingsVaultIntents.isRegistered(makeAddr("newVault")), true);
+    }
+
+}
+
 contract SavingsVaultIntentsRequestTests is TestBase {
 
     // Failure tests
 
-    function test_request_invalidVaultAddress() public {
-        vm.expectRevert(ISavingsVaultIntents.InvalidVaultAddress.selector);
+    function test_request_vaultNotWhitelisted() public {
+        vm.expectRevert(ISavingsVaultIntents.VaultNotWhitelisted.selector);
         savingsVaultIntents.request({
             vault     : address(0),
             shares    : userShares,
@@ -190,6 +252,41 @@ contract SavingsVaultIntentsRequestTests is TestBase {
         savingsVaultIntents.request({
             vault     : address(vault),
             shares    : minIntentShares,
+            recipient : user,
+            deadline  : block.timestamp + 100,
+            v         : 0,
+            r         : 0,
+            s         : 0
+        });
+    }
+
+    function test_request_insufficientSharesBoundary() external {
+        uint256 requestedSharesAtBoundary   = userShares;
+        uint256 requestedSharesOverBoundary = userShares + 1;
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.InsufficientShares.selector,
+                requestedSharesOverBoundary,
+                userShares
+            )
+        );
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(vault),
+            shares    : requestedSharesOverBoundary,
+            recipient : user,
+            deadline  : block.timestamp + 100,
+            v         : 0,
+            r         : 0,
+            s         : 0
+        });
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(vault),
+            shares    : requestedSharesAtBoundary,
             recipient : user,
             deadline  : block.timestamp + 100,
             v         : 0,
@@ -266,10 +363,67 @@ contract SavingsVaultIntentsRequestTests is TestBase {
         });
     }
 
+    function test_request_activeRequestExists() external {
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(vault),
+            shares    : userShares,
+            recipient : user,
+            deadline  : block.timestamp + 100,
+            v         : 0,
+            r         : 0,
+            s         : 0
+        });
+
+        // Creating another request with exact values
+
+        vm.expectRevert(ISavingsVaultIntents.ActiveRequestExists.selector);
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(vault),
+            shares    : userShares,
+            recipient : user,
+            deadline  : block.timestamp + 100,
+            v         : 0,
+            r         : 0,
+            s         : 0
+        });
+
+        // Creating another request with different values
+
+        vm.expectRevert(ISavingsVaultIntents.ActiveRequestExists.selector);
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(vault),
+            shares    : 2e6,
+            recipient : makeAddr("receiver"),
+            deadline  : block.timestamp + 200,
+            v         : 27,
+            r         : bytes32("v"),
+            s         : bytes32("s")
+        });
+
+        // Creating another request after cancel should work
+
+        vm.prank(user);
+        savingsVaultIntents.cancel();
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(vault),
+            shares    : userShares,
+            recipient : user,
+            deadline  : block.timestamp + 100,
+            v         : 0,
+            r         : 0,
+            s         : 0
+        });
+    }
+
     // Success tests
 
     function test_request() public {
-        _assertEmptyRequest(user, 1);
+        _assertEmptyRequest(user);
 
         ( uint8 v, bytes32 r, bytes32 s ) = _generateSignature(userShares, block.timestamp + 100);
 
@@ -300,7 +454,7 @@ contract SavingsVaultIntentsRequestTests is TestBase {
 
         _assertRequest({
             account           : user,
-            requestId         : requestId,
+            expectedRequestId : requestId,
             expectedVault     : address(vault),
             expectedShares    : userShares,
             expectedRecipient : user,
@@ -321,13 +475,12 @@ contract SavingsVaultIntentsCancelTest is TestBase {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.RequestNotFound.selector,
-                user,
-                1
+                user
             )
         );
 
         vm.prank(user);
-        savingsVaultIntents.cancel(1);
+        savingsVaultIntents.cancel();
     }
 
     // Success tests
@@ -349,7 +502,7 @@ contract SavingsVaultIntentsCancelTest is TestBase {
 
         _assertRequest({
             account           : user,
-            requestId         : requestId,
+            expectedRequestId : requestId,
             expectedVault     : address(vault),
             expectedShares    : userShares,
             expectedRecipient : user,
@@ -363,9 +516,9 @@ contract SavingsVaultIntentsCancelTest is TestBase {
         emit ISavingsVaultIntents.RequestCancelled(user, requestId);
 
         vm.prank(user);
-        savingsVaultIntents.cancel(requestId);
+        savingsVaultIntents.cancel();
 
-        _assertEmptyRequest(user, requestId);
+        _assertEmptyRequest(user);
     }
 
 }
@@ -391,21 +544,70 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.RequestNotFound.selector,
-                user,
-                1
+                user
             )
         );
         
         vm.prank(relayer);
-        savingsVaultIntents.fulfill(user, 1);
+        savingsVaultIntents.fulfill(user, 0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.RequestNotFound.selector,
+                address(0)
+            )
+        );
+        
+        vm.prank(relayer);
+        savingsVaultIntents.fulfill(address(0), 1);
+
+        uint256 requestId = _createRequest(userShares, block.timestamp + 100);
+        
+        vm.prank(relayer);
+        savingsVaultIntents.fulfill(user, requestId);
+    }
+
+    function test_fulfill_requestNotFoundRaceCondition() public {
+        // User creates request A
+        uint256 requestA = _createRequest(userShares, block.timestamp + 100);
+
+        // User cancels request A
+        vm.prank(user);
+        savingsVaultIntents.cancel();
+
+        // User creates request B with half of his shares
+        uint256 requestB = _createRequest(userShares/2, block.timestamp + 100);
+
+        // Relayer captured the request A and trying to fulfill
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.RequestNotFound.selector,
+                user
+            )
+        );
+        
+        vm.prank(relayer);
+        savingsVaultIntents.fulfill(user, requestA);
+
+        // Relayer now trying to fulfill request B
+
+        vm.prank(relayer);
+        savingsVaultIntents.fulfill(user, requestB);
     }
 
     function test_fulfill_insufficientUserFundsBoundary() public {
         _drainVaultBalance();
-
         _fundVaultBalance(DEPOSIT_AMOUNT);
+
+        assertEq(vault.balanceOf(address(user)), userShares);
         
-        uint256 requestId = _createRequest(userShares + 1, block.timestamp + 100);
+        uint256 requestId = _createRequest(userShares, block.timestamp + 100);
+
+        // User redeems all of his shares before fulfill
+        vm.prank(user);
+        vault.redeem(userShares, user, user);
+
+        assertEq(vault.balanceOf(address(user)), 0);
 
         assertEq(requestId, 1);
 
@@ -413,9 +615,10 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, requestId);
 
-        requestId = _createRequest(userShares, block.timestamp + 100);
+        // User deposits DEPOSIT_AMOUNT back to vault. So the existing request will be fulfilled.
+        assertEq(_depositToVault(user, DEPOSIT_AMOUNT), userShares);
 
-        assertEq(requestId, 2);
+        assertEq(vault.balanceOf(address(user)), userShares);
 
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, requestId);
@@ -508,7 +711,7 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         assertEq(vault.balanceOf(address(user)),            0);
         assertEq(vault.totalSupply(),                       vaultInitialTotalSupply - userShares);
 
-        _assertEmptyRequest(user, requestId);
+        _assertEmptyRequest(user);
     }
 
     function test_fulfill_worksWhenInvalidPermitButApprovalExists() public {
@@ -543,7 +746,7 @@ contract SavingsVaultIntentsFulfillTest is TestBase {
         assertEq(vault.totalSupply(),                       vaultInitialTotalSupply - userShares);
 
         // Request should be deleted.
-        _assertEmptyRequest(user, requestId);
+        _assertEmptyRequest(user);
     }
 
     // Helper functions

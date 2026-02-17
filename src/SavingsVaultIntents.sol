@@ -19,7 +19,8 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     uint256 public maxDeadline;
     uint256 public minIntentShares;
 
-    mapping(address => mapping(uint256 => WithdrawRequest)) internal _requests;
+    mapping(address => WithdrawRequest) internal _requests;
+    mapping(address => bool)            internal _vaultWhitelist;
 
     constructor(
         address admin,
@@ -60,6 +61,14 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
         emit MinIntentSharesUpdated(minIntentShares_);
     }
 
+    function updateWhitelist(address vault, bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(vault != address(0), InvalidVaultAddress());
+
+        _vaultWhitelist[vault] = enabled;
+
+        emit WhitelistUpdated(vault, enabled);
+    }
+
     /**********************************************************************************************/
     /*** External functions                                                                     ***/
     /**********************************************************************************************/
@@ -75,17 +84,25 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     )
         external returns (uint256 requestId)
     {
-        require(vault     != address(0), InvalidVaultAddress());
-        require(recipient != address(0), InvalidRecipientAddress());
-
+        require(_vaultWhitelist[vault],    VaultNotWhitelisted());
+        require(recipient != address(0),   InvalidRecipientAddress());
         require(shares >= minIntentShares, InvalidIntentShares(minIntentShares, shares));
+
+        uint256 userShares = IERC4626Like(vault).balanceOf(msg.sender);
+
+        require(shares <= userShares, InsufficientShares(shares, userShares));
 
         require(
             deadline > block.timestamp && deadline <= block.timestamp + maxDeadline,
             InvalidDeadline(maxDeadline, deadline)
         );
+        
+        require(_requests[msg.sender].requestId == 0, ActiveRequestExists());
 
-        _requests[msg.sender][requestId = ++_requestCount] = WithdrawRequest({
+        requestId = ++_requestCount;
+
+        _requests[msg.sender] = WithdrawRequest({
+            requestId : requestId,
             vault     : vault,
             shares    : shares,
             recipient : recipient,
@@ -98,60 +115,64 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
         emit RequestCreated(msg.sender, requestId, vault, shares, deadline, v, r, s);
     }
 
-    function cancel(uint256 requestId) external {
-        WithdrawRequest memory request_ = _requests[msg.sender][requestId];
+    function cancel() external {
+        WithdrawRequest memory request_ = _requests[msg.sender];
 
-        require(request_.vault != address(0), RequestNotFound(msg.sender, requestId));
+        require(request_.requestId != 0, RequestNotFound(msg.sender));
 
-        delete _requests[msg.sender][requestId];
+        delete _requests[msg.sender];
 
-        emit RequestCancelled(msg.sender, requestId);
+        emit RequestCancelled(msg.sender, request_.requestId);
     }
 
-    function fulfill(address account, uint256 requestId) external onlyRole(RELAYER) {
-        WithdrawRequest memory _request = _requests[account][requestId];
+    function fulfill(address account, uint256 requestId_) external onlyRole(RELAYER) {
+        WithdrawRequest memory request_ = _requests[account];
 
-        require(_request.vault != address(0), RequestNotFound(account, requestId));
+        require(requestId_ != 0 && request_.requestId == requestId_, RequestNotFound(account));
 
         require(
-            block.timestamp <= _request.deadline,
-            DeadlineExceeded(account, requestId, _request.deadline)
+            block.timestamp <= request_.deadline,
+            DeadlineExceeded(account, request_.requestId, request_.deadline)
         );
 
         // Call permit to approve the transfer
         // Use low-level call to handle case where permit may have already been consumed.
-        _request.vault.call(
+        request_.vault.call(
             abi.encodeWithSelector(
                 IERC4626Like.permit.selector,
                 account,
                 address(this),
-                _request.shares,
-                _request.deadline,
-                _request.v,
-                _request.r,
-                _request.s
+                request_.shares,
+                request_.deadline,
+                request_.v,
+                request_.r,
+                request_.s
             )
         );
 
-        delete _requests[account][requestId];
+        delete _requests[account];
 
-        emit RequestFulfilled(account, requestId);
+        emit RequestFulfilled(account, request_.requestId);
 
-        IERC4626Like(_request.vault).transferFrom(account, address(this), _request.shares);
+        IERC4626Like(request_.vault).transferFrom(account, address(this), request_.shares);
 
-        IERC4626Like(_request.vault).redeem(_request.shares, _request.recipient, address(this));
+        IERC4626Like(request_.vault).redeem(request_.shares, request_.recipient, address(this));
     }
 
     /**********************************************************************************************/
     /*** View functions                                                                         ***/
     /**********************************************************************************************/
 
-    function getRequest(address account, uint256 requestId) 
+    function getRequest(address account) 
         external
         view
         returns (WithdrawRequest memory)
     {
-        return _requests[account][requestId];
+        return _requests[account];
+    }
+
+    function isRegistered(address vault) external view returns (bool) {
+        return _vaultWhitelist[vault];
     }
 
 }
