@@ -13,12 +13,12 @@ interface IERC4626Like {
 
     function deposit(uint256 assets, address receiver) external returns (uint256 shares);
 
-    function permit(address owner, address spender, uint256 value, uint256 deadline, uint8 v, bytes32 r, bytes32 s) external;
-
     function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
 
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 
     function totalSupply() external view returns (uint256);
+
+    function allowance(address owner, address spender) external view returns (uint256);
 
 }

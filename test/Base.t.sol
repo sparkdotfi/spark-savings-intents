@@ -6,7 +6,6 @@ import { Test } from "../lib/forge-std/src/Test.sol";
 import { Ethereum } from "../lib/spark-address-registry/src/Ethereum.sol";
 
 import { IERC20Like }   from "./interfaces/IERC20Like.sol";
-import { IERC712Like }  from "./interfaces/IERC712Like.sol";
 import { IERC4626Like } from "./interfaces/IERC4626Like.sol";
 import { IVaultLike }   from "./interfaces/IVaultLike.sol";
 
@@ -15,7 +14,9 @@ import { SavingsVaultIntents }  from "../src/SavingsVaultIntents.sol";
 
 contract TestBase is Test {
 
-    uint256 internal constant DEPOSIT_AMOUNT = 1_000_000e6;
+    uint256 internal constant DEPOSIT_AMOUNT    = 1_000_000e6;
+    uint256 internal constant MIN_INTENT_SHARES = 10e6;
+    uint256 internal constant MAX_INTENT_SHARES = 100_000_000e6;
 
     IERC4626Like internal vault;
     IERC20Like   internal underlyingAsset;
@@ -29,7 +30,6 @@ contract TestBase is Test {
     address internal unauthorized;
 
     address internal user;
-    uint256 internal userPrivateKey;
     uint256 internal userShares;
 
     SavingsVaultIntents internal savingsVaultIntents;
@@ -42,19 +42,22 @@ contract TestBase is Test {
 
         admin        = makeAddr("admin");
         relayer      = makeAddr("relayer");
+        user         = makeAddr("user");
         unauthorized = makeAddr("unauthorized");
 
-        savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days, 1e6);
+        savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days, MAX_INTENT_SHARES);
 
-        // Whitelist vault
-        _whitelistVault(address(vault), true);
+        // Initial setup of savingsVaultIntents by admin
 
-        defaultAdminRole = savingsVaultIntents.DEFAULT_ADMIN_ROLE();
-        relayerRole      = savingsVaultIntents.RELAYER();
+        vm.startPrank(admin);
 
-        ( user, userPrivateKey ) = makeAddrAndKey("user");
+        savingsVaultIntents.updateWhitelist(address(vault), true);
 
-        // Deal some assets to the user and deposit
+        savingsVaultIntents.setMinIntentShares(MIN_INTENT_SHARES);
+
+        vm.stopPrank();
+
+        // User deposits assets into vault
         userShares = _depositToVault(user, DEPOSIT_AMOUNT);
 
         // Vault totalSupply at _getBlock() + above user deposit
@@ -63,36 +66,6 @@ contract TestBase is Test {
 
     function _getBlock() internal virtual pure returns (uint256) {
         return 24319071; //  January 26, 2026
-    }
-
-    function _generateSignature(
-        uint256 amount_,
-        uint256 deadline_
-    )
-        internal virtual returns (uint8 v, bytes32 r, bytes32 s)
-    {
-        uint256 nonce      = IERC712Like(address(vault)).nonces(user);
-        bytes32 permitHash = IERC712Like(address(vault)).PERMIT_TYPEHASH();
-        bytes32 domainSep  = IERC712Like(address(vault)).DOMAIN_SEPARATOR();
-
-        bytes32 digest = keccak256(
-            abi.encodePacked(
-                "\x19\x01",
-                domainSep,
-                keccak256(
-                    abi.encode(
-                        permitHash,
-                        user,
-                        address(savingsVaultIntents),
-                        amount_,
-                        nonce,
-                        deadline_
-                    )
-                )
-            )
-        );
-
-        ( v, r, s ) = vm.sign(userPrivateKey, digest);
     }
 
     function _drainVaultBalance() internal virtual {
@@ -104,11 +77,6 @@ contract TestBase is Test {
 
     function _fundVaultBalance(uint256 amount_) internal {
         deal(address(underlyingAsset), address(vault), amount_);
-    }
-
-    function _whitelistVault(address vault_, bool enable) internal {
-        vm.prank(admin);
-        savingsVaultIntents.updateWhitelist(vault_, enable);
     }
 
     function _depositToVault(address account, uint256 assets) internal returns (uint256 shares) {
@@ -127,25 +95,23 @@ contract TestBase is Test {
         address expectedVault,
         uint256 expectedShares,
         address expectedRecipient,
-        uint256 expectedDeadline,
-        uint8   expectedV,
-        bytes32 expectedR,
-        bytes32 expectedS
+        uint256 expectedDeadline
     )
         internal view
     {
-        ISavingsVaultIntents.WithdrawRequest memory request_ = savingsVaultIntents.getRequest(
-            account
-        );
+        ( 
+            uint256 requestId_,
+            address vault_,
+            uint256 shares_,
+            address recipient_,
+            uint256 deadline_
+        ) = savingsVaultIntents.withdrawRequests(account);
 
-        assertEq(request_.requestId, expectedRequestId);
-        assertEq(request_.vault,     expectedVault);
-        assertEq(request_.shares,    expectedShares);
-        assertEq(request_.recipient, expectedRecipient);
-        assertEq(request_.deadline,  expectedDeadline);
-        assertEq(request_.v,         expectedV);
-        assertEq(request_.r,         expectedR);
-        assertEq(request_.s,         expectedS);
+        assertEq(requestId_, expectedRequestId);
+        assertEq(vault_,     expectedVault);
+        assertEq(shares_,    expectedShares);
+        assertEq(recipient_, expectedRecipient);
+        assertEq(deadline_,  expectedDeadline);
     }
 
     function _assertEmptyRequest(address account) internal view {
@@ -155,10 +121,7 @@ contract TestBase is Test {
             expectedVault     : address(0),
             expectedShares    : 0,
             expectedRecipient : address(0),
-            expectedDeadline  : 0,
-            expectedV         : 0,
-            expectedR         : 0,
-            expectedS         : 0
+            expectedDeadline  : 0
         });
     }
 

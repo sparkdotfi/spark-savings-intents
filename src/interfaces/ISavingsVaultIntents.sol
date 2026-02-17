@@ -13,9 +13,6 @@ interface ISavingsVaultIntents {
         uint256 shares;
         address recipient;
         uint256 deadline;
-        uint8   v;
-        bytes32 r;
-        bytes32 s;
     }
 
     /**********************************************************************************************/
@@ -34,13 +31,13 @@ interface ISavingsVaultIntents {
 
     error InvalidRecipientAddress();
 
-    error InvalidMinIntentShares();
-
-    error ActiveRequestExists();
+    error InvalidMaxIntentShares();
 
     error InvalidDeadline(uint256 maxDeadline, uint256 deadline);
 
-    error InvalidIntentShares(uint256 minShares, uint256 shares);
+    error IntentSharesBelowMin(uint256 minShares, uint256 shares);
+
+    error IntentSharesAboveMax(uint256 maxShares, uint256 shares);
 
     error InsufficientShares(uint256 sharesRequested, uint256 sharesPresent);
 
@@ -57,10 +54,8 @@ interface ISavingsVaultIntents {
         uint256 indexed requestId,
         address indexed vault,
         uint256         shares,
-        uint256         deadline,
-        uint8           v,
-        bytes32         r,
-        bytes32         s
+        address         recipient,
+        uint256         deadline
     );
 
     event RequestCancelled(address indexed account, uint256 indexed requestId);
@@ -70,6 +65,8 @@ interface ISavingsVaultIntents {
     event MaxDeadlineUpdated(uint256 indexed maxDeadline);
 
     event MinIntentSharesUpdated(uint256 indexed minIntentShares);
+    
+    event MaxIntentSharesUpdated(uint256 indexed maxIntentShares);
 
     event WhitelistUpdated(address indexed vault, bool indexed enabled);
 
@@ -81,6 +78,8 @@ interface ISavingsVaultIntents {
 
     function setMinIntentShares(uint256 minIntentShares_) external;
 
+    function setMaxIntentShares(uint256 maxIntentShares_) external;
+
     function updateWhitelist(address vault, bool enabled) external;
 
     /**********************************************************************************************/
@@ -91,25 +90,11 @@ interface ISavingsVaultIntents {
         address vault,
         uint256 shares,
         address recipient,
-        uint256 deadline,
-        uint8   v,
-        bytes32 r,
-        bytes32 s
+        uint256 deadline
     ) external returns (uint256 requestId);
 
     function cancel() external;
 
     function fulfill(address account, uint256 requestId) external;
-
-    /**********************************************************************************************/
-    /*** View functions                                                                         ***/
-    /**********************************************************************************************/
-
-    function getRequest(address account) 
-        external
-        view 
-        returns (WithdrawRequest memory);
-
-    function isRegistered(address vault) external view returns (bool);
 
 }
