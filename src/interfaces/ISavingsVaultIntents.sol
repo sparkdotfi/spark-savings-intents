@@ -33,6 +33,10 @@ interface ISavingsVaultIntents {
 
     error InvalidMaxIntentShares();
 
+    error MinIntentSharesAboveMax(uint256 minIntentShares, uint256 maxIntentShares);
+
+    error MaxIntentSharesBelowMin(uint256 maxIntentShares, uint256 minIntentShares);
+
     error InvalidDeadline(uint256 maxDeadline, uint256 deadline);
 
     error IntentSharesBelowMin(uint256 minShares, uint256 shares);

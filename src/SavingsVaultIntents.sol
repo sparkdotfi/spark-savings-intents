@@ -55,6 +55,11 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     }
 
     function setMinIntentShares(uint256 minIntentShares_) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            minIntentShares_ < maxIntentShares,
+            MinIntentSharesAboveMax(minIntentShares_, maxIntentShares)
+        );
+
         minIntentShares = minIntentShares_;
 
         emit MinIntentSharesUpdated(minIntentShares_);
@@ -62,6 +67,11 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
 
     function setMaxIntentShares(uint256 maxIntentShares_) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(maxIntentShares_ > 0, InvalidMaxIntentShares());
+
+        require(
+            maxIntentShares_ > minIntentShares,
+            MaxIntentSharesBelowMin(maxIntentShares_, minIntentShares)
+        );
 
         maxIntentShares = maxIntentShares_;
 

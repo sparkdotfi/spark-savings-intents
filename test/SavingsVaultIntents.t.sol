@@ -113,6 +113,22 @@ contract SetMinIntentSharesTests is TestBase {
         savingsVaultIntents.setMinIntentShares(1e6);
     }
 
+    function test_setMinIntentShares_minIntentSharesAboveMaxBoundary() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.MinIntentSharesAboveMax.selector,
+                MAX_INTENT_SHARES,
+                MAX_INTENT_SHARES
+            )
+        );
+
+        vm.prank(admin);
+        savingsVaultIntents.setMinIntentShares(MAX_INTENT_SHARES);
+
+        vm.prank(admin);
+        savingsVaultIntents.setMinIntentShares(MAX_INTENT_SHARES - 1);
+    }
+
     // Success tests
 
     function test_setMinIntentShares() external {
@@ -165,7 +181,23 @@ contract SetMaxIntentSharesTests is TestBase {
         savingsVaultIntents.setMaxIntentShares(0);
 
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentShares(1);
+        savingsVaultIntents.setMaxIntentShares(MIN_INTENT_SHARES + 1);
+    }
+
+    function test_setMaxIntentShares_maxIntentSharesBelowMinBoundary() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.MaxIntentSharesBelowMin.selector,
+                MIN_INTENT_SHARES,
+                MIN_INTENT_SHARES
+            )
+        );
+
+        vm.prank(admin);
+        savingsVaultIntents.setMaxIntentShares(MIN_INTENT_SHARES);
+
+        vm.prank(admin);
+        savingsVaultIntents.setMaxIntentShares(MIN_INTENT_SHARES + 1);
     }
 
     // Success tests
