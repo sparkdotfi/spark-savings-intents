@@ -916,7 +916,9 @@ contract FulfillTests is TestBase {
         _assertEmptyRequest(user);
     }
 
-    // Helper functions
+    /**********************************************************************************************/
+    /*** Helper functions                                                                       ***/
+    /**********************************************************************************************/
 
     function _approveAndCreateRequest(
         address account,

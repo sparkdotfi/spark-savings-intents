@@ -19,39 +19,30 @@ interface ISavingsVaultIntents {
     /*** Errors                                                                                 ***/
     /**********************************************************************************************/
 
-    error InvalidAdminAddress();
-
-    error InvalidMaxDeadline();
-
-    error InvalidRelayerAddress();
-
-    error InvalidVaultAddress();
-
-    error VaultNotWhitelisted();
-
-    error InvalidRecipientAddress();
-
-    error InvalidMaxIntentAssets();
-
-    error MinIntentAssetsAboveMax(uint256 minIntentAssets, uint256 maxIntentAssets);
-
-    error MaxIntentAssetsBelowMin(uint256 maxIntentAssets, uint256 minIntentAssets);
-
-    error InvalidDeadline(uint256 maxDeadline, uint256 deadline);
-
-    error IntentAssetsBelowMin(uint256 minAssets, uint256 assets);
-
-    error IntentAssetsAboveMax(uint256 maxAssets, uint256 assets);
-
-    error InsufficientShares(uint256 sharesRequested, uint256 sharesPresent);
-
     error DeadlineExceeded(address account, uint256 requestId, uint256 deadline);
-
+    error InsufficientShares(uint256 sharesRequested, uint256 sharesPresent);
+    error IntentAssetsAboveMax(uint256 maxAssets, uint256 assets);
+    error IntentAssetsBelowMin(uint256 minAssets, uint256 assets);
+    error InvalidAdminAddress();
+    error InvalidDeadline(uint256 maxDeadline, uint256 deadline);
+    error InvalidMaxDeadline();
+    error InvalidMaxIntentAssets();
+    error InvalidRecipientAddress();
+    error InvalidRelayerAddress();
+    error InvalidVaultAddress();
+    error MaxIntentAssetsBelowMin(uint256 maxIntentAssets, uint256 minIntentAssets);
+    error MinIntentAssetsAboveMax(uint256 minIntentAssets, uint256 maxIntentAssets);
     error RequestNotFound(address account);
+    error VaultNotWhitelisted();
 
     /**********************************************************************************************/
     /*** Events                                                                                 ***/
     /**********************************************************************************************/
+
+    event MaxDeadlineUpdated(uint256 indexed maxDeadline);
+    event MaxIntentAssetsUpdated(uint256 indexed maxIntentAssets);
+    event MinIntentAssetsUpdated(uint256 indexed minIntentAssets);
+    event RequestCancelled(address indexed account, uint256 indexed requestId);
 
     event RequestCreated(
         address indexed account,
@@ -62,16 +53,7 @@ interface ISavingsVaultIntents {
         uint256         deadline
     );
 
-    event RequestCancelled(address indexed account, uint256 indexed requestId);
-
     event RequestFulfilled(address indexed account, uint256 indexed requestId);
-
-    event MaxDeadlineUpdated(uint256 indexed maxDeadline);
-
-    event MinIntentAssetsUpdated(uint256 indexed minIntentAssets);
-    
-    event MaxIntentAssetsUpdated(uint256 indexed maxIntentAssets);
-
     event WhitelistUpdated(address indexed vault, bool indexed enabled);
 
     /**********************************************************************************************/
@@ -90,15 +72,15 @@ interface ISavingsVaultIntents {
     /*** External functions                                                                     ***/
     /**********************************************************************************************/
 
+    function cancel() external;
+
+    function fulfill(address account, uint256 requestId) external;
+
     function request(
         address vault,
         uint256 shares,
         address recipient,
         uint256 deadline
     ) external returns (uint256 requestId);
-
-    function cancel() external;
-
-    function fulfill(address account, uint256 requestId) external;
 
 }

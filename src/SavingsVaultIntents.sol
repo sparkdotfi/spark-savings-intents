@@ -14,14 +14,13 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
 
     bytes32 public constant RELAYER = keccak256("RELAYER");
 
+    uint256 public maxDeadline;
+    uint256 public maxIntentAssets;
+    uint256 public minIntentAssets;
     uint256 public requestCount;
 
-    uint256 public maxDeadline;
-    uint256 public minIntentAssets;
-    uint256 public maxIntentAssets;
-
-    mapping(address => WithdrawRequest) public withdrawRequests;
     mapping(address => bool)            public vaultWhitelist;
+    mapping(address => WithdrawRequest) public withdrawRequests;
 
     constructor(
         address admin,
