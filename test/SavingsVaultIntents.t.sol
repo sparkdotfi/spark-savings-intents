@@ -27,8 +27,8 @@ contract ConstructorTests is TestBase {
         new SavingsVaultIntents(admin, relayer, 0, 1e6);
     }
 
-    function test_constructor_invalidMaxIntentShares() external {
-        vm.expectRevert(ISavingsVaultIntents.InvalidMaxIntentShares.selector);
+    function test_constructor_invalidMaxIntentAssets() external {
+        vm.expectRevert(ISavingsVaultIntents.InvalidMaxIntentAssets.selector);
         new SavingsVaultIntents(admin, relayer, 1 days, 0);
     }
 
@@ -42,14 +42,14 @@ contract ConstructorTests is TestBase {
             admin            : admin_,
             relayer          : relayer_,
             maxDeadline_     : 1 days,
-            maxIntentShares_ : 100_000_000e6
+            maxIntentAssets_ : 100_000_000e6
         });
 
         assertEq(intentInstance.hasRole(intentInstance.DEFAULT_ADMIN_ROLE(), admin_),   true);
         assertEq(intentInstance.hasRole(intentInstance.RELAYER(),            relayer_), true);
 
         assertEq(intentInstance.maxDeadline(),     1 days);
-        assertEq(intentInstance.maxIntentShares(), 100_000_000e6);
+        assertEq(intentInstance.maxIntentAssets(), 100_000_000e6);
     }
 
 }
@@ -96,11 +96,11 @@ contract SetMaxDeadlineTests is TestBase {
 
 }
 
-contract SetMinIntentSharesTests is TestBase {
+contract SetMinIntentAssetsTests is TestBase {
 
     // Failure tests
 
-    function test_setMinIntentShares_noAuth() external {
+    function test_setMinIntentAssets_noAuth() external {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
@@ -110,54 +110,54 @@ contract SetMinIntentSharesTests is TestBase {
         );
 
         vm.prank(unauthorized);
-        savingsVaultIntents.setMinIntentShares(1e6);
+        savingsVaultIntents.setMinIntentAssets(1e6);
     }
 
-    function test_setMinIntentShares_minIntentSharesAboveMaxBoundary() external {
+    function test_setMinIntentAssets_minIntentAssetsAboveMaxBoundary() external {
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.MinIntentSharesAboveMax.selector,
-                MAX_INTENT_SHARES,
-                MAX_INTENT_SHARES
+                ISavingsVaultIntents.MinIntentAssetsAboveMax.selector,
+                MAX_INTENT_ASSETS,
+                MAX_INTENT_ASSETS
             )
         );
 
         vm.prank(admin);
-        savingsVaultIntents.setMinIntentShares(MAX_INTENT_SHARES);
+        savingsVaultIntents.setMinIntentAssets(MAX_INTENT_ASSETS);
 
         vm.prank(admin);
-        savingsVaultIntents.setMinIntentShares(MAX_INTENT_SHARES - 1);
+        savingsVaultIntents.setMinIntentAssets(MAX_INTENT_ASSETS - 1);
     }
 
     // Success tests
 
-    function test_setMinIntentShares() external {
-        assertEq(savingsVaultIntents.minIntentShares(), MIN_INTENT_SHARES);
+    function test_setMinIntentAssets() external {
+        assertEq(savingsVaultIntents.minIntentAssets(), MIN_INTENT_ASSETS);
 
         vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.MinIntentSharesUpdated(0);
+        emit ISavingsVaultIntents.MinIntentAssetsUpdated(0);
 
         vm.prank(admin);
-        savingsVaultIntents.setMinIntentShares(0);
+        savingsVaultIntents.setMinIntentAssets(0);
 
-        assertEq(savingsVaultIntents.minIntentShares(), 0);
+        assertEq(savingsVaultIntents.minIntentAssets(), 0);
 
         vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.MinIntentSharesUpdated(10_000_000e6);
+        emit ISavingsVaultIntents.MinIntentAssetsUpdated(10_000_000e6);
 
         vm.prank(admin);
-        savingsVaultIntents.setMinIntentShares(10_000_000e6);
+        savingsVaultIntents.setMinIntentAssets(10_000_000e6);
 
-        assertEq(savingsVaultIntents.minIntentShares(), 10_000_000e6);
+        assertEq(savingsVaultIntents.minIntentAssets(), 10_000_000e6);
     }
 
 }
 
-contract SetMaxIntentSharesTests is TestBase {
+contract SetMaxIntentAssetsTests is TestBase {
 
     // Failure tests
 
-    function test_setMaxIntentShares_noAuth() external {
+    function test_setMaxIntentAssets_noAuth() external {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
@@ -167,70 +167,70 @@ contract SetMaxIntentSharesTests is TestBase {
         );
 
         vm.prank(unauthorized);
-        savingsVaultIntents.setMaxIntentShares(1e6);
+        savingsVaultIntents.setMaxIntentAssets(1e6);
     }
 
-    function test_setMaxIntentShares_invalidMaxIntentSharesBoundary() external {
-        // Setting maxIntentShares zero when minIntentShares > 0 should revert
+    function test_setMaxIntentAssets_invalidMaxIntentAssetsBoundary() external {
+        // Setting maxIntentAssets zero when minIntentAssets > 0 should revert
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.MaxIntentSharesBelowMin.selector,
+                ISavingsVaultIntents.MaxIntentAssetsBelowMin.selector,
                 0,
-                MIN_INTENT_SHARES
+                MIN_INTENT_ASSETS
             )
         );
 
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentShares(0);
+        savingsVaultIntents.setMaxIntentAssets(0);
 
-        // Setting maxIntentShares zero when minIntentShares == 0 (0 > 0), should revert
+        // Setting maxIntentAssets zero when minIntentAssets == 0 (0 > 0), should revert
         vm.prank(admin);
-        savingsVaultIntents.setMinIntentShares(0);
+        savingsVaultIntents.setMinIntentAssets(0);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.MaxIntentSharesBelowMin.selector,
+                ISavingsVaultIntents.MaxIntentAssetsBelowMin.selector,
                 0,
                 0
             )
         );
 
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentShares(0);
+        savingsVaultIntents.setMaxIntentAssets(0);
 
-        // Setting maxIntentShare to 1 passes when minIntentShares == 0 (1 > 0)
+        // Setting maxIntentAssets to 1 passes when minIntentAssets == 0 (1 > 0)
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentShares(1);
+        savingsVaultIntents.setMaxIntentAssets(1);
     }
 
-    function test_setMaxIntentShares_maxIntentSharesBelowMinBoundary() external {
+    function test_setMaxIntentAssets_maxIntentAssetsBelowMinBoundary() external {
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.MaxIntentSharesBelowMin.selector,
-                MIN_INTENT_SHARES,
-                MIN_INTENT_SHARES
+                ISavingsVaultIntents.MaxIntentAssetsBelowMin.selector,
+                MIN_INTENT_ASSETS,
+                MIN_INTENT_ASSETS
             )
         );
 
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentShares(MIN_INTENT_SHARES);
+        savingsVaultIntents.setMaxIntentAssets(MIN_INTENT_ASSETS);
 
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentShares(MIN_INTENT_SHARES + 1);
+        savingsVaultIntents.setMaxIntentAssets(MIN_INTENT_ASSETS + 1);
     }
 
     // Success tests
 
-    function test_setMaxIntentShares() external {
-        assertEq(savingsVaultIntents.maxIntentShares(), MAX_INTENT_SHARES);
+    function test_setMaxIntentAssets() external {
+        assertEq(savingsVaultIntents.maxIntentAssets(), MAX_INTENT_ASSETS);
 
         vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.MaxIntentSharesUpdated(100_000e6);
+        emit ISavingsVaultIntents.MaxIntentAssetsUpdated(100_000e6);
 
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentShares(100_000e6);
+        savingsVaultIntents.setMaxIntentAssets(100_000e6);
 
-        assertEq(savingsVaultIntents.maxIntentShares(), 100_000e6);
+        assertEq(savingsVaultIntents.maxIntentAssets(), 100_000e6);
     }
 
 }
@@ -323,19 +323,23 @@ contract RequestTests is TestBase {
         });
     }
 
-    function test_request_intentSharesBelowMinBoundary() external {
+    function test_request_intentAssetsBelowMinBoundary() external {
+        uint256 minIntentSharesAtBoundary    = vault.convertToShares(MIN_INTENT_ASSETS) + 1; // Rounding
+        uint256 minIntentSharesUnderBoundary = minIntentSharesAtBoundary - 1;
+        uint256 minIntentAssetsUnderBoundary = vault.convertToAssets(minIntentSharesUnderBoundary);
+
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.IntentSharesBelowMin.selector,
-                MIN_INTENT_SHARES,
-                MIN_INTENT_SHARES - 1
+                ISavingsVaultIntents.IntentAssetsBelowMin.selector,
+                MIN_INTENT_ASSETS,
+                minIntentAssetsUnderBoundary
             )
         );
 
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(vault),
-            shares    : MIN_INTENT_SHARES - 1,
+            shares    : minIntentSharesUnderBoundary,
             recipient : user,
             deadline  : block.timestamp + 100
         });
@@ -343,27 +347,31 @@ contract RequestTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(vault),
-            shares    : MIN_INTENT_SHARES,
+            shares    : minIntentSharesAtBoundary,
             recipient : user,
             deadline  : block.timestamp + 100
         });
     }
 
-    function test_request_intentSharesAboveMaxBoundary() external {
-        _depositToVault(user, vault.convertToAssets(MAX_INTENT_SHARES + 1));
+    function test_request_intentAssetsAboveMaxBoundary() external {
+        uint256 maxIntentSharesAtBoundary    = vault.convertToShares(MAX_INTENT_ASSETS) + 1; // Rounding
+        uint256 maxIntentSharesAboveBoundary = maxIntentSharesAtBoundary + 1;
+        uint256 maxIntentAssetsAboveBoundary = vault.convertToAssets(maxIntentSharesAboveBoundary);
+
+        _depositToVault(user, MAX_INTENT_ASSETS + 1);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.IntentSharesAboveMax.selector,
-                MAX_INTENT_SHARES,
-                MAX_INTENT_SHARES + 1
+                ISavingsVaultIntents.IntentAssetsAboveMax.selector,
+                MAX_INTENT_ASSETS,
+                maxIntentAssetsAboveBoundary
             )
         );
 
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(vault),
-            shares    : MAX_INTENT_SHARES + 1,
+            shares    : maxIntentSharesAboveBoundary,
             recipient : user,
             deadline  : block.timestamp + 100
         });
@@ -371,7 +379,7 @@ contract RequestTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(vault),
-            shares    : MAX_INTENT_SHARES,
+            shares    : maxIntentSharesAtBoundary,
             recipient : user,
             deadline  : block.timestamp + 100
         });
@@ -537,14 +545,14 @@ contract RequestTests is TestBase {
             expectedDeadline  : block.timestamp + 100
         });
 
-        // Overwriting request 1
+        // Overwriting request 1 with userShares - 10
 
         vm.expectEmit(address(savingsVaultIntents));
         emit ISavingsVaultIntents.RequestCreated({
             account   : user,
             requestId : 2,
             vault     : address(vault),
-            shares    : MIN_INTENT_SHARES,
+            shares    : userShares - 10,
             recipient : user,
             deadline  : block.timestamp + 200
         });
@@ -552,7 +560,7 @@ contract RequestTests is TestBase {
         vm.prank(user);
         requestId = savingsVaultIntents.request({
             vault     : address(vault),
-            shares    : MIN_INTENT_SHARES,
+            shares    : userShares - 10,
             recipient : user,
             deadline  : block.timestamp + 200
         });
@@ -565,7 +573,7 @@ contract RequestTests is TestBase {
             account           : user,
             expectedRequestId : requestId,
             expectedVault     : address(vault),
-            expectedShares    : MIN_INTENT_SHARES,
+            expectedShares    : userShares - 10,
             expectedRecipient : user,
             expectedDeadline  : block.timestamp + 200
         });
@@ -573,7 +581,7 @@ contract RequestTests is TestBase {
 
 }
 
-contract SavingsVaultIntentsCancelTest is TestBase {
+contract CancelTests is TestBase {
 
     // Failure tests
 
@@ -687,7 +695,7 @@ contract SavingsVaultIntentsCancelTest is TestBase {
 
 }
 
-contract SavingsVaultIntentsFulfillTest is TestBase {
+contract FulfillTests is TestBase {
 
     // Failure tests
 

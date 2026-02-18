@@ -3,16 +3,6 @@ pragma solidity ^0.8.27;
 
 interface IERC4626Like {
 
-    function permit(
-        address owner,
-        address spender,
-        uint256 value,
-        uint256 deadline,
-        uint8   v,
-        bytes32 r,
-        bytes32 s
-    ) external;
-
     function redeem(
         uint256 shares,
         address receiver,
@@ -22,5 +12,7 @@ interface IERC4626Like {
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 
     function balanceOf(address owner) external view returns (uint256);
+
+    function convertToAssets(uint256 shares) external view returns (uint256 assets);
 
 }

@@ -31,17 +31,17 @@ interface ISavingsVaultIntents {
 
     error InvalidRecipientAddress();
 
-    error InvalidMaxIntentShares();
+    error InvalidMaxIntentAssets();
 
-    error MinIntentSharesAboveMax(uint256 minIntentShares, uint256 maxIntentShares);
+    error MinIntentAssetsAboveMax(uint256 minIntentAssets, uint256 maxIntentAssets);
 
-    error MaxIntentSharesBelowMin(uint256 maxIntentShares, uint256 minIntentShares);
+    error MaxIntentAssetsBelowMin(uint256 maxIntentAssets, uint256 minIntentAssets);
 
     error InvalidDeadline(uint256 maxDeadline, uint256 deadline);
 
-    error IntentSharesBelowMin(uint256 minShares, uint256 shares);
+    error IntentAssetsBelowMin(uint256 minAssets, uint256 assets);
 
-    error IntentSharesAboveMax(uint256 maxShares, uint256 shares);
+    error IntentAssetsAboveMax(uint256 maxAssets, uint256 assets);
 
     error InsufficientShares(uint256 sharesRequested, uint256 sharesPresent);
 
@@ -68,9 +68,9 @@ interface ISavingsVaultIntents {
 
     event MaxDeadlineUpdated(uint256 indexed maxDeadline);
 
-    event MinIntentSharesUpdated(uint256 indexed minIntentShares);
+    event MinIntentAssetsUpdated(uint256 indexed minIntentAssets);
     
-    event MaxIntentSharesUpdated(uint256 indexed maxIntentShares);
+    event MaxIntentAssetsUpdated(uint256 indexed maxIntentAssets);
 
     event WhitelistUpdated(address indexed vault, bool indexed enabled);
 
@@ -80,9 +80,9 @@ interface ISavingsVaultIntents {
 
     function setMaxDeadline(uint256 maxDeadline_) external;
 
-    function setMinIntentShares(uint256 minIntentShares_) external;
+    function setMinIntentAssets(uint256 minIntentAssets_) external;
 
-    function setMaxIntentShares(uint256 maxIntentShares_) external;
+    function setMaxIntentAssets(uint256 maxIntentAssets_) external;
 
     function updateWhitelist(address vault, bool enabled) external;
 

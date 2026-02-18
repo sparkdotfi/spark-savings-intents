@@ -15,8 +15,8 @@ import { SavingsVaultIntents }  from "../src/SavingsVaultIntents.sol";
 contract TestBase is Test {
 
     uint256 internal constant DEPOSIT_AMOUNT    = 1_000_000e6;
-    uint256 internal constant MIN_INTENT_SHARES = 10e6;
-    uint256 internal constant MAX_INTENT_SHARES = 100_000_000e6;
+    uint256 internal constant MIN_INTENT_ASSETS = 10e6;
+    uint256 internal constant MAX_INTENT_ASSETS = 100_000_000e6;
 
     IERC4626Like internal vault;
     IERC20Like   internal underlyingAsset;
@@ -45,7 +45,7 @@ contract TestBase is Test {
         user         = makeAddr("user");
         unauthorized = makeAddr("unauthorized");
 
-        savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days, MAX_INTENT_SHARES);
+        savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days, MAX_INTENT_ASSETS);
 
         // Initial setup of savingsVaultIntents by admin
 
@@ -53,7 +53,7 @@ contract TestBase is Test {
 
         savingsVaultIntents.updateWhitelist(address(vault), true);
 
-        savingsVaultIntents.setMinIntentShares(MIN_INTENT_SHARES);
+        savingsVaultIntents.setMinIntentAssets(MIN_INTENT_ASSETS);
 
         vm.stopPrank();
 
