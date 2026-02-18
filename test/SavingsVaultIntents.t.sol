@@ -171,17 +171,36 @@ contract SetMaxIntentSharesTests is TestBase {
     }
 
     function test_setMaxIntentShares_invalidMaxIntentSharesBoundary() external {
+        // Setting maxIntentShares zero when minIntentShares > 0 should revert
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.InvalidMaxIntentShares.selector
+                ISavingsVaultIntents.MaxIntentSharesBelowMin.selector,
+                0,
+                MIN_INTENT_SHARES
             )
         );
 
         vm.prank(admin);
         savingsVaultIntents.setMaxIntentShares(0);
 
+        // Setting maxIntentShares zero when minIntentShares == 0 (0 > 0), should revert
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentShares(MIN_INTENT_SHARES + 1);
+        savingsVaultIntents.setMinIntentShares(0);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.MaxIntentSharesBelowMin.selector,
+                0,
+                0
+            )
+        );
+
+        vm.prank(admin);
+        savingsVaultIntents.setMaxIntentShares(0);
+
+        // Setting maxIntentShare to 1 passes when minIntentShares == 0 (1 > 0)
+        vm.prank(admin);
+        savingsVaultIntents.setMaxIntentShares(1);
     }
 
     function test_setMaxIntentShares_maxIntentSharesBelowMinBoundary() external {
