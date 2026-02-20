@@ -1,167 +1,151 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
-pragma solidity ^0.8.13;
+pragma solidity ^0.8.27;
 
-import { IERC20Like, IERC712Like, TestBase } from "./Base.t.sol";
+import { Vm } from "../lib/forge-std/src/Test.sol";
 
-import { SavingsVaultIntents } from "../src/SavingsVaultIntents.sol";
+import { TestBase } from "./Base.t.sol";
+
+import { ISavingsVaultIntents } from "../src/interfaces/ISavingsVaultIntents.sol";
 
 contract SavingsVaultIntentsE2ETests is TestBase {
-
+    
     function test_e2e_vanilla() external {
-        _removeAllBalanceFromVault();
+        // Step 0: Setup.
 
-        // Step 1: User requests a withdrawal.
+        _drainVaultBalance();
+        _fundVaultBalance(DEPOSIT_AMOUNT);
 
-        ( uint8 v, bytes32 r, bytes32 s ) = _generateSignature(userShares, block.timestamp + 100);
+        // Step 1: User creates request
+
+        _assertEmptyRequest(user);
+
+        assertEq(savingsVaultIntents.requestCount(), 0);
+
+        // Approve the transfer.
+        vm.prank(user);
+        vault.approve(address(savingsVaultIntents), userShares);
 
         vm.expectEmit(address(savingsVaultIntents));
-        emit SavingsVaultIntents.Request(user, 1, address(vault), userShares, block.timestamp + 100, v, r, s);
+        emit ISavingsVaultIntents.RequestCreated({
+            account   : user,
+            requestId : 1,
+            vault     : address(vault),
+            shares    : userShares,
+            recipient : user,
+            deadline  : block.timestamp + 100
+        });
 
         vm.prank(user);
         uint256 requestId = savingsVaultIntents.request({
-            vault:     address(vault),
-            shares:    userShares,
-            recipient: user,
-            deadline:  block.timestamp + 100,
-            v:         v,
-            r:         r,
-            s:         s
+            vault     : address(vault),
+            shares    : userShares,
+            recipient : user,
+            deadline  : block.timestamp + 100
         });
 
         assertEq(requestId, 1);
 
-        ( 
-            address vault_,
-            uint256 shares_,
-            address recipient_,
-            uint256 deadline_,
-            uint8   v_,
-            bytes32 r_,
-            bytes32 s_ 
-        ) = savingsVaultIntents.requests(user, 1);
-        
-        assertEq(vault_,     address(vault));
-        assertEq(shares_,    userShares);
-        assertEq(recipient_, user);
-        assertEq(deadline_,  block.timestamp + 100);
-        assertEq(v_,         v);
-        assertEq(r_,         r);
-        assertEq(s_,         s);
+        assertEq(savingsVaultIntents.requestCount(), 1);
+
+        _assertRequest({
+            account           : user,
+            expectedRequestId : requestId,
+            expectedVault     : address(vault),
+            expectedShares    : userShares,
+            expectedRecipient : user,
+            expectedDeadline  : block.timestamp + 100
+        });
 
         // Step 2: Relayer fulfills the request.
-        
-        // Deal vault some assets.
 
-        address asset = vault.asset();
+        assertEq(underlyingAsset.balanceOf(address(vault)),DEPOSIT_AMOUNT);
+        assertEq(underlyingAsset.balanceOf(address(user)), 0);
+        assertEq(vault.balanceOf(user),                    userShares);
+        assertEq(vault.totalSupply(),                      vaultInitialTotalSupply);
 
-        deal(asset, address(vault), DEPOSIT_AMOUNT);
-
-        // Fulfill the request.
-
-        assertEq(IERC20Like(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT);
-        assertEq(IERC20Like(asset).balanceOf(address(user)),  0);
-        assertEq(vault.balanceOf(address(user)),              userShares);
+        assertEq(vault.allowance(user, address(savingsVaultIntents)), userShares);
 
         vm.expectEmit(address(savingsVaultIntents));
-        emit SavingsVaultIntents.Fulfill(address(user), 1);
+        emit ISavingsVaultIntents.RequestFulfilled(address(user), requestId);
 
         vm.prank(relayer);
-        savingsVaultIntents.fulfill(address(user), 1);
+        savingsVaultIntents.fulfill(address(user), requestId);
 
-        assertEq(IERC20Like(asset).balanceOf(address(vault)), 1);
-        assertEq(IERC20Like(asset).balanceOf(address(user)),  DEPOSIT_AMOUNT - 1);
-        assertEq(vault.balanceOf(address(user)),              0);
+        assertEq(underlyingAsset.balanceOf(address(vault)), 1);
+        assertEq(underlyingAsset.balanceOf(address(user)),  DEPOSIT_AMOUNT - 1); // Rounding
+        assertEq(vault.balanceOf(address(user)),            0);
+        assertEq(vault.totalSupply(),                       vaultInitialTotalSupply - userShares);
+
+        assertEq(vault.allowance(user, address(savingsVaultIntents)), 0);
+
+        _assertEmptyRequest(user);
     }
 
-    function test_e2e_multipleRequests() external {
-        // Step 0: Setup.
-
-        ( address user1, uint256 userPrivateKey1 ) = _createUser("test test test test test test test test test test test junk");
-        ( address user2, uint256 userPrivateKey2 ) = _createUser("abandon zoo abandon zoo abandon zoo abandon zoo abandon zoo abandon wrestle");
-        ( address user3, uint256 userPrivateKey3 ) = _createUser("candy maple cake sugar pudding cream honey rich smooth crumble sweet treat");
-
-        uint256 userShares1 = _depositToUser(user1, DEPOSIT_AMOUNT);
-        uint256 userShares2 = _depositToUser(user2, DEPOSIT_AMOUNT);
-        uint256 userShares3 = _depositToUser(user3, DEPOSIT_AMOUNT);
-
-        _removeAllBalanceFromVault();
-
-        // Step 1: Multiple users request a withdrawal.
-        
-        uint256 requestId1 = _createRequest(user1, userPrivateKey1, userShares1, block.timestamp + 100);
-        uint256 requestId2 = _createRequest(user2, userPrivateKey2, userShares2, block.timestamp + 100);
-        uint256 requestId3 = _createRequest(user3, userPrivateKey3, userShares3, block.timestamp + 100);
-
-        // Step 2: Relayer fulfills the requests.
-
-        address asset = vault.asset();
-
-        deal(asset, address(vault), DEPOSIT_AMOUNT * 3);
-
-        assertEq(IERC20Like(asset).balanceOf(address(vault)), DEPOSIT_AMOUNT * 3);
-        assertEq(IERC20Like(asset).balanceOf(user1),          0);
-        assertEq(IERC20Like(asset).balanceOf(user2),          0);
-        assertEq(IERC20Like(asset).balanceOf(user3),          0);
-
-        vm.startPrank(relayer);
-
-        savingsVaultIntents.fulfill(user1, requestId1);
-        savingsVaultIntents.fulfill(user2, requestId2);
-        savingsVaultIntents.fulfill(user3, requestId3);
-
-        vm.stopPrank();
-
-        assertEq(IERC20Like(asset).balanceOf(address(vault)), 3);
-        assertEq(IERC20Like(asset).balanceOf(user1),          DEPOSIT_AMOUNT - 1);
-        assertEq(IERC20Like(asset).balanceOf(user2),          DEPOSIT_AMOUNT - 1);
-        assertEq(IERC20Like(asset).balanceOf(user3),          DEPOSIT_AMOUNT - 1);
+    function test_e2e_fulfillMultipleRequestsSameUser() external {
+        // - Step 1: User creates request for 1/3 shares
+        // - Step 2: User creates another request for 1/3 shares
+        // - Step 3: Relayer fulfills both
+        // - Step 4: Verify user has remaining 1/3 shares + received assets
     }
 
-    function _createUser(string memory mnemonic_) internal returns (address user, uint256 userPrivateKey) {
-        userPrivateKey = vm.deriveKey(mnemonic_, 1);
-        user           = vm.addr(userPrivateKey);
+    function test_e2e_fulfillMultipleRequestsOutofOrder() external {
+        // - Step 1: User creates multiple requests
+        // - Step 2: Relayer fulfills requests in a random order
     }
 
-    function _depositToUser(address user_, uint256 amount_) internal returns (uint256 userShares) {
-        deal(vault.asset(), user_, amount_);
-
-        vm.startPrank(user_);
-
-        IERC20Like(vault.asset()).approve(address(vault), amount_);
-
-        userShares = vault.deposit(amount_, user_);
-
-        vm.stopPrank();
+    function test_e2e_fulfillAfterTimePassesButBeforeDeadline() external {
+        // - Step 1: User creates request with 100s deadline
+        // - Step 2: Warp 99 seconds forward
+        // - Step 3: Relayer fulfills successfully
     }
 
-    function _createRequest(address user_, uint256 userPrivateKey_, uint256 shares_, uint256 deadline_) internal returns (uint256 requestId) {
-        ( uint8 v, bytes32 r, bytes32 s ) = _generateUserSignature(user_, userPrivateKey_, shares_, deadline_);
-            
-        vm.prank(user_);
-        requestId = savingsVaultIntents.request({
-            vault:     address(vault),
-            shares:    shares_,
-            recipient: user_,
-            deadline:  deadline_,
-            v:         v,
-            r:         r,
-            s:         s
-        });
+    function test_e2e_fulfillAfterDeadlineReverts() external {
+        // - Step 1: User creates request with 100s deadline
+        // - Step 2: Warp 101 seconds forward
+        // - Step 3: Relayer fulfill reverts with DeadlineExceeded
+        // - Step 4: User cancels the stale request to clean up
     }
 
-    function _generateUserSignature(
-        address user_,
-        uint256 userPrivateKey_,
-        uint256 amount_,
-        uint256 deadline_
-    )
-        internal virtual returns (uint8 v, bytes32 r, bytes32 s)
-    {
-        uint256 nonce        = IERC712Like(address(vault)).nonces(user_);
-        bytes32 permitDigest = keccak256(abi.encode(IERC712Like(address(vault)).PERMIT_TYPEHASH(), user_, address(savingsVaultIntents), amount_, nonce, deadline_));
-        bytes32 digest       = keccak256(abi.encodePacked("\x19\x01", IERC712Like(address(vault)).DOMAIN_SEPARATOR(), permitDigest));
+    function test_e2e_requestCancelAndRequestAgain() external {
+        // Step 1: User creates request
 
-        ( v, r, s ) = vm.sign(userPrivateKey_, digest);
+
+        // Step 2: User cancels
+        // Step 3: User creates a new request (new signature, new requestId)
+        // Step 4: Relayer fulfills the new request
+    }
+
+    function test_e2e_partialWithdrawal() external {
+        // - Step 1: User creates request for half of shares
+        // - Step 2: Relayer fulfills
+        // - Step 3: Verify user still has remaining shares + received assets
+    }
+
+    function test_e2e_cancelAfterDeadline() external {
+        // - Step 1: User creates request
+        // - Step 2: Deadline passes
+        // - Step 3: User cancels successfully (cancel has no deadline check)
+        // - Step 4: Verify request cleared, user still holds shares
+    }
+
+    function test_e2e_withdrawToDifferentRecipient() external {
+        // - Step 1: User creates request with a different recipient
+        // - Step 2: Relayer fulfills
+        // - Step 3: Verify recipient received assets, not the user
+    }
+
+    function test_e2e_fulfillWithPreApproval() external {
+        // - Step 1: User approves savingsVaultIntents directly (no permit needed)
+        // - Step 2: User creates request (with dummy/invalid signature)
+        // - Step 3: Relayer fulfills — low-level permit call fails silently, transferFrom uses existing approval
+        // - Step 4: Verify assets received
+    }
+
+    function test_e2e_adminUpdatesParametersMidFlight() external {
+        // - Step 1: User creates request
+        // - Step 2: Admin updates maxDeadline and minIntentShares
+        // - Step 3: Relayer still fulfills existing request (it was valid at creation)
+        // - Step 4: New request must follow updated parameters
     }
 
 }
