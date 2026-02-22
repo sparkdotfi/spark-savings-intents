@@ -15,30 +15,25 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     bytes32 public constant RELAYER = keccak256("RELAYER");
 
     uint256 public maxDeadline;
-    uint256 public maxIntentAssets;
-    uint256 public minIntentAssets;
     uint256 public requestCount;
 
-    mapping(address => bool)            public vaultWhitelist;
+    mapping(address => VaultConfig)     public vaultConfig;
     mapping(address => WithdrawRequest) public withdrawRequests;
 
     constructor(
         address admin,
         address relayer,
-        uint256 maxDeadline_,
-        uint256 maxIntentAssets_
+        uint256 maxDeadline_
     ) {
         require(admin   != address(0), InvalidAdminAddress());
         require(relayer != address(0), InvalidRelayerAddress());
 
         require(maxDeadline_     > 0, InvalidMaxDeadline());
-        require(maxIntentAssets_ > 0, InvalidMaxIntentAssets());
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(RELAYER,            relayer);
 
-        maxDeadline     = maxDeadline_;
-        maxIntentAssets = maxIntentAssets_;
+        maxDeadline = maxDeadline_;
     }
 
     /**********************************************************************************************/
@@ -53,34 +48,28 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
         emit MaxDeadlineUpdated(maxDeadline_);
     }
 
-    function setMinIntentAssets(uint256 minIntentAssets_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(
-            minIntentAssets_ < maxIntentAssets,
-            MinIntentAssetsAboveMax(minIntentAssets_, maxIntentAssets)
-        );
-
-        minIntentAssets = minIntentAssets_;
-
-        emit MinIntentAssetsUpdated(minIntentAssets_);
-    }
-
-    function setMaxIntentAssets(uint256 maxIntentAssets_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(
-            maxIntentAssets_ > minIntentAssets,
-            MaxIntentAssetsBelowMin(maxIntentAssets_, minIntentAssets)
-        );
-
-        maxIntentAssets = maxIntentAssets_;
-
-        emit MaxIntentAssetsUpdated(maxIntentAssets_);
-    }
-
-    function updateWhitelist(address vault, bool enabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateVaultConfig(
+        address vault,
+        bool    whitelisted_,
+        uint256 minIntentAssets_,
+        uint256 maxIntentAssets_
+    )
+        external onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         require(vault != address(0), InvalidVaultAddress());
 
-        vaultWhitelist[vault] = enabled;
+        require(
+            minIntentAssets_ < maxIntentAssets_,
+            InvalidIntentAmountBounds(minIntentAssets_, maxIntentAssets_)
+        );
 
-        emit WhitelistUpdated(vault, enabled);
+        vaultConfig[vault] = VaultConfig({
+            whitelisted     : whitelisted_,
+            minIntentAssets : minIntentAssets_,
+            maxIntentAssets : maxIntentAssets_
+        });
+
+        emit VaultConfigUpdated(vault, whitelisted_, minIntentAssets_, maxIntentAssets_);
     }
 
     /**********************************************************************************************/
@@ -95,13 +84,22 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     )
         external returns (uint256 requestId)
     {
-        require(vaultWhitelist[vault],     VaultNotWhitelisted());
+        VaultConfig memory vaultConfig_ = vaultConfig[vault];
+
+        require(vaultConfig_.whitelisted,  VaultNotWhitelisted());
         require(recipient != address(0),   InvalidRecipientAddress());
 
         uint256 assets = IERC4626Like(vault).convertToAssets(shares);
 
-        require(assets >= minIntentAssets, IntentAssetsBelowMin(minIntentAssets, assets));
-        require(assets <= maxIntentAssets, IntentAssetsAboveMax(maxIntentAssets, assets));
+        require(
+            assets >= vaultConfig_.minIntentAssets,
+            IntentAssetsBelowMin(vaultConfig_.minIntentAssets, assets)
+        );
+
+        require(
+            assets <= vaultConfig_.maxIntentAssets,
+            IntentAssetsAboveMax(vaultConfig_.maxIntentAssets, assets)
+        );
 
         uint256 userShares = IERC4626Like(vault).balanceOf(msg.sender);
 

@@ -7,6 +7,12 @@ interface ISavingsVaultIntents {
     /*** Types                                                                                  ***/
     /**********************************************************************************************/
 
+    struct VaultConfig {
+        bool    whitelisted;
+        uint256 minIntentAssets;
+        uint256 maxIntentAssets;
+    }
+
     struct WithdrawRequest {
         uint256 requestId;
         address vault;
@@ -26,12 +32,10 @@ interface ISavingsVaultIntents {
     error InvalidAdminAddress();
     error InvalidDeadline(uint256 maxDeadline, uint256 deadline);
     error InvalidMaxDeadline();
-    error InvalidMaxIntentAssets();
     error InvalidRecipientAddress();
     error InvalidRelayerAddress();
     error InvalidVaultAddress();
-    error MaxIntentAssetsBelowMin(uint256 maxIntentAssets, uint256 minIntentAssets);
-    error MinIntentAssetsAboveMax(uint256 minIntentAssets, uint256 maxIntentAssets);
+    error InvalidIntentAmountBounds(uint256 minIntentAssets, uint256 maxIntentAssets);
     error RequestNotFound(address account);
     error VaultNotWhitelisted();
 
@@ -40,8 +44,6 @@ interface ISavingsVaultIntents {
     /**********************************************************************************************/
 
     event MaxDeadlineUpdated(uint256 indexed maxDeadline);
-    event MaxIntentAssetsUpdated(uint256 indexed maxIntentAssets);
-    event MinIntentAssetsUpdated(uint256 indexed minIntentAssets);
     event RequestCancelled(address indexed account, uint256 indexed requestId);
 
     event RequestCreated(
@@ -54,7 +56,13 @@ interface ISavingsVaultIntents {
     );
 
     event RequestFulfilled(address indexed account, uint256 indexed requestId);
-    event WhitelistUpdated(address indexed vault, bool indexed enabled);
+
+    event VaultConfigUpdated(
+        address indexed vault,
+        bool    indexed whitelisted,
+        uint256         minIntentAssets,
+        uint256         maxIntentAssets
+    );
 
     /**********************************************************************************************/
     /*** Admin functions                                                                        ***/
@@ -62,11 +70,12 @@ interface ISavingsVaultIntents {
 
     function setMaxDeadline(uint256 maxDeadline_) external;
 
-    function setMinIntentAssets(uint256 minIntentAssets_) external;
-
-    function setMaxIntentAssets(uint256 maxIntentAssets_) external;
-
-    function updateWhitelist(address vault, bool enabled) external;
+    function updateVaultConfig(
+        address vault,
+        bool    whitelisted_,
+        uint256 minIntentAssets_,
+        uint256 maxIntentAssets_
+    ) external;
 
     /**********************************************************************************************/
     /*** External functions                                                                     ***/

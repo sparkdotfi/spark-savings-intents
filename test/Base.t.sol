@@ -45,17 +45,17 @@ contract TestBase is Test {
         user         = makeAddr("user");
         unauthorized = makeAddr("unauthorized");
 
-        savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days, MAX_INTENT_ASSETS);
+        savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days);
 
         // Initial setup of savingsVaultIntents by admin
 
-        vm.startPrank(admin);
-
-        savingsVaultIntents.updateWhitelist(address(vault), true);
-
-        savingsVaultIntents.setMinIntentAssets(MIN_INTENT_ASSETS);
-
-        vm.stopPrank();
+        vm.prank(admin);
+        savingsVaultIntents.updateVaultConfig(
+            address(vault),
+            true,
+            MIN_INTENT_ASSETS,
+            MAX_INTENT_ASSETS
+        );
 
         // User deposits assets into vault
         userShares = _depositToVault(user, DEPOSIT_AMOUNT);

@@ -14,22 +14,17 @@ contract ConstructorTests is TestBase {
 
     function test_constructor_invalidAdmin() external {
         vm.expectRevert(ISavingsVaultIntents.InvalidAdminAddress.selector);
-        new SavingsVaultIntents(address(0), relayer, 1 days, 1e6);
+        new SavingsVaultIntents(address(0), relayer, 1 days);
     }
 
     function test_constructor_invalidRelayer() external {
         vm.expectRevert(ISavingsVaultIntents.InvalidRelayerAddress.selector);
-        new SavingsVaultIntents(admin, address(0), 1 days, 1e6);
+        new SavingsVaultIntents(admin, address(0), 1 days);
     }
 
     function test_constructor_invalidMaxDeadline() external {
         vm.expectRevert(ISavingsVaultIntents.InvalidMaxDeadline.selector);
-        new SavingsVaultIntents(admin, relayer, 0, 1e6);
-    }
-
-    function test_constructor_invalidMaxIntentAssets() external {
-        vm.expectRevert(ISavingsVaultIntents.InvalidMaxIntentAssets.selector);
-        new SavingsVaultIntents(admin, relayer, 1 days, 0);
+        new SavingsVaultIntents(admin, relayer, 0);
     }
 
     // Success tests
@@ -39,17 +34,15 @@ contract ConstructorTests is TestBase {
         address relayer_ = makeAddr("relayer");
 
         SavingsVaultIntents intentInstance = new SavingsVaultIntents({
-            admin            : admin_,
-            relayer          : relayer_,
-            maxDeadline_     : 1 days,
-            maxIntentAssets_ : 100_000_000e6
+            admin        : admin_,
+            relayer      : relayer_,
+            maxDeadline_ : 1 days
         });
 
         assertEq(intentInstance.hasRole(intentInstance.DEFAULT_ADMIN_ROLE(), admin_),   true);
         assertEq(intentInstance.hasRole(intentInstance.RELAYER(),            relayer_), true);
 
-        assertEq(intentInstance.maxDeadline(),     1 days);
-        assertEq(intentInstance.maxIntentAssets(), 100_000_000e6);
+        assertEq(intentInstance.maxDeadline(), 1 days);
     }
 
 }
@@ -96,11 +89,11 @@ contract SetMaxDeadlineTests is TestBase {
 
 }
 
-contract SetMinIntentAssetsTests is TestBase {
+contract UpdateVaultConfigTests is TestBase {
 
     // Failure tests
 
-    function test_setMinIntentAssets_noAuth() external {
+    function test_updateVaultConfig_noAuth() external {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
@@ -110,54 +103,13 @@ contract SetMinIntentAssetsTests is TestBase {
         );
 
         vm.prank(unauthorized);
-        savingsVaultIntents.setMinIntentAssets(1e6);
-    }
-
-    function test_setMinIntentAssets_minIntentAssetsAboveMaxBoundary() external {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ISavingsVaultIntents.MinIntentAssetsAboveMax.selector,
-                MAX_INTENT_ASSETS,
-                MAX_INTENT_ASSETS
-            )
+        savingsVaultIntents.updateVaultConfig(
+            makeAddr("vault"),
+            true,
+            MIN_INTENT_ASSETS,
+            MAX_INTENT_ASSETS
         );
 
-        vm.prank(admin);
-        savingsVaultIntents.setMinIntentAssets(MAX_INTENT_ASSETS);
-
-        vm.prank(admin);
-        savingsVaultIntents.setMinIntentAssets(MAX_INTENT_ASSETS - 1);
-    }
-
-    // Success tests
-
-    function test_setMinIntentAssets() external {
-        assertEq(savingsVaultIntents.minIntentAssets(), MIN_INTENT_ASSETS);
-
-        vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.MinIntentAssetsUpdated(0);
-
-        vm.prank(admin);
-        savingsVaultIntents.setMinIntentAssets(0);
-
-        assertEq(savingsVaultIntents.minIntentAssets(), 0);
-
-        vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.MinIntentAssetsUpdated(10_000_000e6);
-
-        vm.prank(admin);
-        savingsVaultIntents.setMinIntentAssets(10_000_000e6);
-
-        assertEq(savingsVaultIntents.minIntentAssets(), 10_000_000e6);
-    }
-
-}
-
-contract SetMaxIntentAssetsTests is TestBase {
-
-    // Failure tests
-
-    function test_setMaxIntentAssets_noAuth() external {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
@@ -167,132 +119,160 @@ contract SetMaxIntentAssetsTests is TestBase {
         );
 
         vm.prank(unauthorized);
-        savingsVaultIntents.setMaxIntentAssets(1e6);
+        savingsVaultIntents.updateVaultConfig(
+            address(vault),
+            true,
+            MIN_INTENT_ASSETS,
+            MAX_INTENT_ASSETS
+        );
     }
 
-    function test_setMaxIntentAssets_invalidMaxIntentAssetsBoundary() external {
-        // Setting maxIntentAssets zero when minIntentAssets > 0 should revert
+    function test_updateVaultConfig_invalidVaultAddress() external {
+        vm.expectRevert(ISavingsVaultIntents.InvalidVaultAddress.selector);
+        vm.prank(admin);
+        savingsVaultIntents.updateVaultConfig(
+            address(0),
+            true,
+            MIN_INTENT_ASSETS,
+            MAX_INTENT_ASSETS
+        );
+
+        vm.expectRevert(ISavingsVaultIntents.InvalidVaultAddress.selector);
+        vm.prank(admin);
+        savingsVaultIntents.updateVaultConfig(
+            address(0),
+            true,
+            MIN_INTENT_ASSETS,
+            MAX_INTENT_ASSETS
+        );
+    }
+
+    function test_updateVaultConfig_invalidIntentAmountBoundsBoundary() external {
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.MaxIntentAssetsBelowMin.selector,
-                0,
-                MIN_INTENT_ASSETS
+                ISavingsVaultIntents.InvalidIntentAmountBounds.selector,
+                1,
+                0
             )
         );
 
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentAssets(0);
-
-        // Setting maxIntentAssets zero when minIntentAssets == 0 (0 > 0), should revert
-        vm.prank(admin);
-        savingsVaultIntents.setMinIntentAssets(0);
+        savingsVaultIntents.updateVaultConfig(
+            address(vault),
+            true,
+            1,
+            0
+        );
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.MaxIntentAssetsBelowMin.selector,
+                ISavingsVaultIntents.InvalidIntentAmountBounds.selector,
                 0,
                 0
             )
         );
 
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentAssets(0);
-
-        // Setting maxIntentAssets to 1 passes when minIntentAssets == 0 (1 > 0)
-        vm.prank(admin);
-        savingsVaultIntents.setMaxIntentAssets(1);
-    }
-
-    function test_setMaxIntentAssets_maxIntentAssetsBelowMinBoundary() external {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ISavingsVaultIntents.MaxIntentAssetsBelowMin.selector,
-                MIN_INTENT_ASSETS,
-                MIN_INTENT_ASSETS
-            )
+        savingsVaultIntents.updateVaultConfig(
+            address(vault),
+            true,
+            0,
+            0
         );
 
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentAssets(MIN_INTENT_ASSETS);
+        savingsVaultIntents.updateVaultConfig(
+            address(vault),
+            true,
+            0,
+            1
+        );
 
         vm.prank(admin);
-        savingsVaultIntents.setMaxIntentAssets(MIN_INTENT_ASSETS + 1);
+        savingsVaultIntents.updateVaultConfig(
+            address(vault),
+            false,
+            0,
+            1
+        );
     }
 
     // Success tests
 
-    function test_setMaxIntentAssets() external {
-        assertEq(savingsVaultIntents.maxIntentAssets(), MAX_INTENT_ASSETS);
+    function test_updateVaultConfig() external {
+        (
+            bool    whitelisted,
+            uint256 minIntentAssets,
+            uint256 maxIntentAssets
+        ) = savingsVaultIntents.vaultConfig(address(vault));
+
+        assertEq(whitelisted,     true);
+        assertEq(minIntentAssets, MIN_INTENT_ASSETS);
+        assertEq(maxIntentAssets, MAX_INTENT_ASSETS);
 
         vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.MaxIntentAssetsUpdated(100_000e6);
-
-        vm.prank(admin);
-        savingsVaultIntents.setMaxIntentAssets(100_000e6);
-
-        assertEq(savingsVaultIntents.maxIntentAssets(), 100_000e6);
-    }
-
-}
-
-contract UpdateWhitelistTests is TestBase {
-
-    // Failure tests
-
-    function test_updateWhitelist_noAuth() external {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                savingsVaultIntents.DEFAULT_ADMIN_ROLE()
-            )
+        emit ISavingsVaultIntents.VaultConfigUpdated(
+            address(vault),
+            false,
+            0,
+            1
         );
 
-        vm.prank(unauthorized);
-        savingsVaultIntents.updateWhitelist(makeAddr("vault"), true);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                savingsVaultIntents.DEFAULT_ADMIN_ROLE()
-            )
+        vm.prank(admin);
+        savingsVaultIntents.updateVaultConfig(
+            address(vault),
+            false,
+            0,
+            1
         );
 
-        vm.prank(unauthorized);
-        savingsVaultIntents.updateWhitelist(address(vault), false);
+        (
+            whitelisted,
+            minIntentAssets,
+            maxIntentAssets
+        ) = savingsVaultIntents.vaultConfig(address(vault));
+
+        assertEq(whitelisted,     false);
+        assertEq(minIntentAssets, 0);
+        assertEq(maxIntentAssets, 1);
     }
 
-    function test_updateWhitelist_invalidVaultAddress() external {
-        vm.expectRevert(ISavingsVaultIntents.InvalidVaultAddress.selector);
-        vm.prank(admin);
-        savingsVaultIntents.updateWhitelist(address(0), true);
+    function test_updateVaultConfig_newVault() external {
+        (
+            bool    whitelisted,
+            uint256 minIntentAssets,
+            uint256 maxIntentAssets
+        ) = savingsVaultIntents.vaultConfig(makeAddr("newVault"));
 
-        vm.expectRevert(ISavingsVaultIntents.InvalidVaultAddress.selector);
-        vm.prank(admin);
-        savingsVaultIntents.updateWhitelist(address(0), false);
-    }
-
-    // Success tests
-
-    function test_updateWhitelist() external {
-        assertEq(savingsVaultIntents.vaultWhitelist(address(vault)),       true);
-        assertEq(savingsVaultIntents.vaultWhitelist(makeAddr("newVault")),   false);
+        assertEq(whitelisted,     false);
+        assertEq(minIntentAssets, 0);
+        assertEq(maxIntentAssets, 0);
 
         vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.WhitelistUpdated(address(vault), false);
+        emit ISavingsVaultIntents.VaultConfigUpdated(
+            makeAddr("newVault"),
+            true,
+            MIN_INTENT_ASSETS,
+            MAX_INTENT_ASSETS
+        );
 
         vm.prank(admin);
-        savingsVaultIntents.updateWhitelist(address(vault), false);
+        savingsVaultIntents.updateVaultConfig(
+            makeAddr("newVault"),
+            true,
+            MIN_INTENT_ASSETS,
+            MAX_INTENT_ASSETS
+        );
 
-        vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.WhitelistUpdated(makeAddr("newVault"), true);
+        (
+            whitelisted,
+            minIntentAssets,
+            maxIntentAssets
+        ) = savingsVaultIntents.vaultConfig(makeAddr("newVault"));
 
-        vm.prank(admin);
-        savingsVaultIntents.updateWhitelist(makeAddr("newVault"), true);
-
-        assertEq(savingsVaultIntents.vaultWhitelist(address(vault)),       false);
-        assertEq(savingsVaultIntents.vaultWhitelist(makeAddr("newVault")), true);
+        assertEq(whitelisted,     true);
+        assertEq(minIntentAssets, MIN_INTENT_ASSETS);
+        assertEq(maxIntentAssets, MAX_INTENT_ASSETS);
     }
 
 }
