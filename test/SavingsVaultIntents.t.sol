@@ -455,7 +455,7 @@ contract RequestTests is TestBase {
     function test_request() public {
         _assertEmptyRequest(user, sparkVaultUSDC);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 0);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
 
         vm.expectEmit(address(savingsVaultIntents));
         emit ISavingsVaultIntents.RequestCreated({
@@ -477,7 +477,7 @@ contract RequestTests is TestBase {
 
         assertEq(requestId, 1);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
 
         _assertRequest({
             account           : user,
@@ -492,7 +492,7 @@ contract RequestTests is TestBase {
     function test_request_overwriteRequest() public {
         _assertEmptyRequest(user, sparkVaultUSDC);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 0);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
 
         vm.expectEmit(address(savingsVaultIntents));
         emit ISavingsVaultIntents.RequestCreated({
@@ -514,7 +514,7 @@ contract RequestTests is TestBase {
 
         assertEq(requestId, 1);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
 
         _assertRequest({
             account           : user,
@@ -547,7 +547,7 @@ contract RequestTests is TestBase {
 
         assertEq(requestId, 2);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 2);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 2);
 
         _assertRequest({
             account           : user,
@@ -563,8 +563,8 @@ contract RequestTests is TestBase {
         _assertEmptyRequest(user, sparkVaultUSDC);
         _assertEmptyRequest(user, sparkVaultETH);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 0);
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultETH)),  0);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)),  0);
 
         // Create request for sparkVaultUSDC
 
@@ -609,8 +609,8 @@ contract RequestTests is TestBase {
         assertEq(requestIdVaultUSDC, 1);
         assertEq(requestIdVaultETH,  1);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 1);
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultETH)),  1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)),  1);
 
         _assertRequest({
             account           : user,
@@ -652,7 +652,7 @@ contract RequestTests is TestBase {
 
         assertEq(requestIdVaultUSDC, 2);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 2);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 2);
 
         _assertRequest({
             account           : user,
@@ -665,7 +665,7 @@ contract RequestTests is TestBase {
 
         // Request of sparkVaultETH will remain same.
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultETH)), 1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)), 1);
 
         _assertRequest({
             account           : user,
@@ -719,7 +719,7 @@ contract CancelTests is TestBase {
     // Success tests
 
     function test_cancel() public {
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 0);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
 
         uint256 requestId = _createRequest(
             user,
@@ -730,7 +730,7 @@ contract CancelTests is TestBase {
 
         assertEq(requestId, 1);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
 
         _assertRequest({
             account           : user,
@@ -747,14 +747,14 @@ contract CancelTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.cancel(address(sparkVaultUSDC));
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
 
         _assertEmptyRequest(user, sparkVaultUSDC);
     }
 
     function test_cancel_multipleVaults_onlyAffectsTargetVault() public {
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 0);
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultETH)),  0);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)),  0);
 
         uint256 requestIdVaultUSDC = _createRequest(
             user,
@@ -773,8 +773,8 @@ contract CancelTests is TestBase {
         assertEq(requestIdVaultUSDC, 1);
         assertEq(requestIdVaultETH,  1);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 1);
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultETH)),  1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)),  1);
 
         _assertRequest({
             account           : user,
@@ -806,13 +806,13 @@ contract CancelTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.cancel(address(sparkVaultUSDC));
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
 
         _assertEmptyRequest(user, sparkVaultUSDC);
 
         // Request sparkVaultETH will not be affected
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultETH)),  1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)),  1);
 
         _assertRequest({
             account           : user,
@@ -825,7 +825,7 @@ contract CancelTests is TestBase {
     }
 
     function test_cancel_afterRequestOverwrite() public {
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 0);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
 
         vm.prank(user);
         uint256 requestId = savingsVaultIntents.request({
@@ -837,7 +837,7 @@ contract CancelTests is TestBase {
 
         assertEq(requestId, 1);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
 
         _assertRequest({
             account           : user,
@@ -860,7 +860,7 @@ contract CancelTests is TestBase {
     
         assertEq(requestId, 2);
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 2);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 2);
 
         _assertRequest({
             account           : user,
@@ -878,7 +878,7 @@ contract CancelTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.cancel(address(sparkVaultUSDC));
 
-        assertEq(savingsVaultIntents.vaultToRequestCount(address(sparkVaultUSDC)), 2);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 2);
 
         _assertEmptyRequest(user, sparkVaultUSDC);
     }

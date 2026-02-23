@@ -16,10 +16,10 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
 
     uint256 public maxDeadline;
 
-    mapping(address => VaultConfig) public vaultConfig;
-    mapping(address => uint256)     public vaultToRequestCount;
+    mapping(address vault => VaultConfig) public vaultConfig;
+    mapping(address vault => uint256)     public vaultRequestCount;
 
-    mapping(address => mapping(address => WithdrawRequest)) public withdrawRequests;
+    mapping(address account => mapping(address vault => WithdrawRequest)) public withdrawRequests;
 
     constructor(address admin, address relayer, uint256 maxDeadline_) {
         require(admin   != address(0), InvalidAdminAddress());
@@ -107,7 +107,7 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
             InvalidDeadline(maxDeadline, deadline)
         );
 
-        requestId = ++vaultToRequestCount[vault];
+        requestId = ++vaultRequestCount[vault];
 
         withdrawRequests[msg.sender][vault] = WithdrawRequest({
             requestId : requestId,
