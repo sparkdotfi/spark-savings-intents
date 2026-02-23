@@ -14,9 +14,9 @@ import { SavingsVaultIntents }  from "../src/SavingsVaultIntents.sol";
 
 contract TestBase is Test {
 
-    uint256 internal constant DEPOSIT_AMOUNT    = 1_000_000e6;
-    uint256 internal constant MIN_INTENT_ASSETS = 10e6;
-    uint256 internal constant MAX_INTENT_ASSETS = 100_000_000e6;
+    uint256 internal DEPOSIT_AMOUNT    = 1_000_000e6;
+    uint256 internal MIN_INTENT_ASSETS = 10e6;
+    uint256 internal MAX_INTENT_ASSETS = 100_000_000e6;
 
     IERC4626Like internal vault;
     IERC20Like   internal underlyingAsset;
