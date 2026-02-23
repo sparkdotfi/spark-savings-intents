@@ -9,6 +9,7 @@ import { TestBase } from "./Base.t.sol";
 
 import { IERC20Like }   from "./interfaces/IERC20Like.sol";
 import { IERC4626Like } from "./interfaces/IERC4626Like.sol";
+import { IVaultLike }   from "./interfaces/IVaultLike.sol";
 
 import { ISavingsVaultIntents } from "../src/interfaces/ISavingsVaultIntents.sol";
 import { SavingsVaultIntents }  from "../src/SavingsVaultIntents.sol";
@@ -775,6 +776,187 @@ contract ETHVaultIntentsE2ETests is TestBase {
         assertEq(vault.totalSupply(),                       vaultInitialTotalSupply - userShares);
 
         assertEq(vault.allowance(user, address(savingsVaultIntents)), 0);
+
+        _assertEmptyRequest(user);
+    }
+
+}
+
+contract MultipleVaultsIntentsE2ETests is TestBase {
+
+    uint256 internal DEPOSIT_AMOUNT_ETH    = 1_000e18;
+    uint256 internal MIN_INTENT_ASSETS_ETH = 10e18;
+    uint256 internal MAX_INTENT_ASSETS_ETH = 10_000e18;
+
+    IERC4626Like internal ethVault;
+    IERC20Like   internal underlyingAsset_eth;
+    uint256      internal vaultInitialTotalSupply_eth;
+
+    uint256 internal userShares_eth;
+    
+    function setUp() public virtual override {
+        super.setUp();
+
+        ethVault            = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPETH);
+        underlyingAsset_eth = IERC20Like(ethVault.asset());
+
+        // Initial setup of savingsVaultIntents by admin
+
+        vm.prank(admin);
+        savingsVaultIntents.updateVaultConfig(
+            address(ethVault),
+            true,
+            MIN_INTENT_ASSETS_ETH,
+            MAX_INTENT_ASSETS_ETH
+        );
+
+        // User deposits assets into vault
+        deal(address(underlyingAsset_eth), user, DEPOSIT_AMOUNT_ETH);
+
+        vm.prank(user);
+        underlyingAsset_eth.approve(address(ethVault), DEPOSIT_AMOUNT_ETH);
+
+        vm.prank(user);
+        userShares_eth = ethVault.deposit(DEPOSIT_AMOUNT_ETH, user);
+
+        // Vault totalSupply at _getBlock() + above user deposit
+        vaultInitialTotalSupply_eth = ethVault.totalSupply();
+    }
+
+    function test_e2e_multipleVaults() external {
+        // Step 0: Setup.
+        vm.startPrank(Ethereum.ALM_PROXY);
+        IVaultLike(address(vault)).take(underlyingAsset.balanceOf(address(vault)));
+        IVaultLike(address(ethVault)).take(underlyingAsset_eth.balanceOf(address(ethVault)));
+        vm.stopPrank();
+
+        // Fund vault upto DEPOSIT_AMOUNT and DEPOSIT_AMOUNT_ETH
+        deal(address(underlyingAsset),     address(vault),    DEPOSIT_AMOUNT);
+        deal(address(underlyingAsset_eth), address(ethVault), DEPOSIT_AMOUNT_ETH);
+
+        // Step 1: User creates request for USDC vault
+        _assertEmptyRequest(user);
+
+        assertEq(savingsVaultIntents.requestCount(), 0);
+
+        // Approve the transfer.
+        vm.prank(user);
+        vault.approve(address(savingsVaultIntents), userShares);
+
+        vm.expectEmit(address(savingsVaultIntents));
+        emit ISavingsVaultIntents.RequestCreated({
+            account   : user,
+            requestId : 1,
+            vault     : address(vault),
+            shares    : userShares,
+            recipient : user,
+            deadline  : block.timestamp + 100
+        });
+
+        vm.prank(user);
+        uint256 requestId = savingsVaultIntents.request({
+            vault     : address(vault),
+            shares    : userShares,
+            recipient : user,
+            deadline  : block.timestamp + 100
+        });
+
+        assertEq(requestId, 1);
+
+        assertEq(savingsVaultIntents.requestCount(), 1);
+
+        _assertRequest({
+            account           : user,
+            expectedRequestId : requestId,
+            expectedVault     : address(vault),
+            expectedShares    : userShares,
+            expectedRecipient : user,
+            expectedDeadline  : block.timestamp + 100
+        });
+
+        // Request gets fulfilled
+        assertEq(underlyingAsset.balanceOf(address(vault)), DEPOSIT_AMOUNT);
+        assertEq(underlyingAsset.balanceOf(address(user)),  0);
+        assertEq(vault.balanceOf(user),                     userShares);
+        assertEq(vault.totalSupply(),                       vaultInitialTotalSupply);
+
+        assertEq(vault.allowance(user, address(savingsVaultIntents)), userShares);
+
+        vm.expectEmit(address(savingsVaultIntents));
+        emit ISavingsVaultIntents.RequestFulfilled(address(user), requestId);
+
+        vm.prank(relayer);
+        savingsVaultIntents.fulfill(address(user), requestId);
+
+        assertEq(underlyingAsset.balanceOf(address(vault)), 1);
+        assertEq(underlyingAsset.balanceOf(address(user)),  DEPOSIT_AMOUNT - 1); // Rounding
+        assertEq(vault.balanceOf(address(user)),            0);
+        assertEq(vault.totalSupply(),                       vaultInitialTotalSupply - userShares);
+
+        assertEq(vault.allowance(user, address(savingsVaultIntents)), 0);
+
+        _assertEmptyRequest(user);
+
+        // Step 2: User creates request for ETH vault
+        _assertEmptyRequest(user);
+
+        assertEq(savingsVaultIntents.requestCount(), 1);
+
+        // Approve the transfer.
+        vm.prank(user);
+        ethVault.approve(address(savingsVaultIntents), userShares_eth);
+
+        vm.expectEmit(address(savingsVaultIntents));
+        emit ISavingsVaultIntents.RequestCreated({
+            account   : user,
+            requestId : 2,
+            vault     : address(ethVault),
+            shares    : userShares_eth,
+            recipient : user,
+            deadline  : block.timestamp + 100
+        });
+
+        vm.prank(user);
+        requestId = savingsVaultIntents.request({
+            vault     : address(ethVault),
+            shares    : userShares_eth,
+            recipient : user,
+            deadline  : block.timestamp + 100
+        });
+
+        assertEq(requestId, 2);
+
+        assertEq(savingsVaultIntents.requestCount(), 2);
+
+        _assertRequest({
+            account           : user,
+            expectedRequestId : requestId,
+            expectedVault     : address(ethVault),
+            expectedShares    : userShares_eth,
+            expectedRecipient : user,
+            expectedDeadline  : block.timestamp + 100
+        });
+
+        // Request gets fulfilled
+        assertEq(underlyingAsset_eth.balanceOf(address(ethVault)), DEPOSIT_AMOUNT_ETH);
+        assertEq(underlyingAsset_eth.balanceOf(address(user)),     0);
+        assertEq(ethVault.balanceOf(user),                         userShares_eth);
+        assertEq(ethVault.totalSupply(),                           vaultInitialTotalSupply_eth);
+
+        assertEq(ethVault.allowance(user, address(savingsVaultIntents)), userShares_eth);
+
+        vm.expectEmit(address(savingsVaultIntents));
+        emit ISavingsVaultIntents.RequestFulfilled(address(user), requestId);
+
+        vm.prank(relayer);
+        savingsVaultIntents.fulfill(address(user), requestId);
+
+        assertEq(underlyingAsset_eth.balanceOf(address(ethVault)), 1);
+        assertEq(underlyingAsset_eth.balanceOf(address(user)),     DEPOSIT_AMOUNT_ETH - 1); // Rounding
+        assertEq(ethVault.balanceOf(address(user)),                0);
+        assertEq(ethVault.totalSupply(),                           vaultInitialTotalSupply_eth - userShares_eth);
+
+        assertEq(ethVault.allowance(user, address(savingsVaultIntents)), 0);
 
         _assertEmptyRequest(user);
     }
