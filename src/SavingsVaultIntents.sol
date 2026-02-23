@@ -15,20 +15,17 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     bytes32 public constant RELAYER = keccak256("RELAYER");
 
     uint256 public maxDeadline;
-    uint256 public requestCount;
 
-    mapping(address => VaultConfig)     public vaultConfig;
-    mapping(address => WithdrawRequest) public withdrawRequests;
+    mapping(address => VaultConfig) public vaultConfig;
+    mapping(address => uint256)     public vaultToRequestCount;
 
-    constructor(
-        address admin,
-        address relayer,
-        uint256 maxDeadline_
-    ) {
+    mapping(address => mapping(address => WithdrawRequest)) public withdrawRequests;
+
+    constructor(address admin, address relayer, uint256 maxDeadline_) {
         require(admin   != address(0), InvalidAdminAddress());
         require(relayer != address(0), InvalidRelayerAddress());
 
-        require(maxDeadline_     > 0, InvalidMaxDeadline());
+        require(maxDeadline_ > 0, InvalidMaxDeadline());
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(RELAYER,            relayer);
@@ -86,8 +83,8 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     {
         VaultConfig memory vaultConfig_ = vaultConfig[vault];
 
-        require(vaultConfig_.whitelisted,  VaultNotWhitelisted());
-        require(recipient != address(0),   InvalidRecipientAddress());
+        require(vaultConfig_.whitelisted, VaultNotWhitelisted());
+        require(recipient != address(0),  InvalidRecipientAddress());
 
         uint256 assets = IERC4626Like(vault).convertToAssets(shares);
 
@@ -110,46 +107,55 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
             InvalidDeadline(maxDeadline, deadline)
         );
 
-        requestId = ++requestCount;
+        requestId = ++vaultToRequestCount[vault];
 
-        withdrawRequests[msg.sender] = WithdrawRequest({
+        withdrawRequests[msg.sender][vault] = WithdrawRequest({
             requestId : requestId,
-            vault     : vault,
             shares    : shares,
             recipient : recipient,
             deadline  : deadline
         });
 
-        emit RequestCreated(msg.sender, requestId, vault, shares, recipient, deadline);
+        emit RequestCreated(msg.sender, vault, requestId, shares, recipient, deadline);
     }
 
-    function cancel() external {
-        WithdrawRequest memory request_ = withdrawRequests[msg.sender];
+    function cancel(address vault) external {
+        WithdrawRequest memory request_ = withdrawRequests[msg.sender][vault];
 
-        require(request_.requestId != 0, RequestNotFound(msg.sender));
+        require(request_.requestId != 0, RequestNotFound(msg.sender, vault));
 
-        delete withdrawRequests[msg.sender];
+        delete withdrawRequests[msg.sender][vault];
 
-        emit RequestCancelled(msg.sender, request_.requestId);
+        emit RequestCancelled(msg.sender, vault, request_.requestId);
     }
 
-    function fulfill(address account, uint256 requestId_) external onlyRole(RELAYER) {
-        WithdrawRequest memory request_ = withdrawRequests[account];
+    function fulfill(
+        address account,
+        address vault,
+        uint256 requestId_
+    )
+        external
+        onlyRole(RELAYER)
+    {
+        WithdrawRequest memory request_ = withdrawRequests[account][vault];
 
-        require(requestId_ != 0 && request_.requestId == requestId_, RequestNotFound(account));
+        require(
+            requestId_ != 0 && request_.requestId == requestId_,
+            RequestNotFound(account, vault)
+        );
 
         require(
             block.timestamp <= request_.deadline,
-            DeadlineExceeded(account, request_.requestId, request_.deadline)
+            DeadlineExceeded(account, vault, request_.requestId, request_.deadline)
         );
 
-        delete withdrawRequests[account];
+        delete withdrawRequests[account][vault];
 
-        emit RequestFulfilled(account, request_.requestId);
+        emit RequestFulfilled(account, vault, request_.requestId);
 
-        IERC4626Like(request_.vault).transferFrom(account, address(this), request_.shares);
+        IERC4626Like(vault).transferFrom(account, address(this), request_.shares);
 
-        IERC4626Like(request_.vault).redeem(request_.shares, request_.recipient, address(this));
+        IERC4626Like(vault).redeem(request_.shares, request_.recipient, address(this));
     }
 
 }

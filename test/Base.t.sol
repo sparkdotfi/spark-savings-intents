@@ -14,13 +14,18 @@ import { SavingsVaultIntents }  from "../src/SavingsVaultIntents.sol";
 
 contract TestBase is Test {
 
-    uint256 internal constant DEPOSIT_AMOUNT    = 1_000_000e6;
-    uint256 internal constant MIN_INTENT_ASSETS = 10e6;
-    uint256 internal constant MAX_INTENT_ASSETS = 100_000_000e6;
+    uint256 internal constant DEPOSIT_AMOUNT_USDC    = 1_000_000e6;
+    uint256 internal constant MIN_INTENT_ASSETS_USDC = 10e6;
+    uint256 internal constant MAX_INTENT_ASSETS_USDC = 100_000_000e6;
 
-    IERC4626Like internal vault;
-    IERC20Like   internal underlyingAsset;
-    uint256      internal vaultInitialTotalSupply;
+    uint256 internal constant DEPOSIT_AMOUNT_ETH    = 100e18;
+    uint256 internal constant MIN_INTENT_ASSETS_ETH = 10e18;
+    uint256 internal constant MAX_INTENT_ASSETS_ETH = 10_000e18;
+
+    IERC4626Like internal sparkVaultUSDC;
+    IERC4626Like internal sparkVaultETH;
+    uint256      internal sparkVaultUSDCInitSupply;
+    uint256      internal sparkVaultETHInitSupply;
 
     bytes32 internal defaultAdminRole;
     bytes32 internal relayerRole;
@@ -30,15 +35,16 @@ contract TestBase is Test {
     address internal unauthorized;
 
     address internal user;
-    uint256 internal userShares;
+    uint256 internal userSpUSDCShares;
+    uint256 internal userSpETHShares;
 
     SavingsVaultIntents internal savingsVaultIntents;
 
     function setUp() public virtual {
         vm.createSelectFork(getChain("mainnet").rpcUrl, _getBlock());
 
-        vault           = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPUSDC);
-        underlyingAsset = IERC20Like(vault.asset());
+        sparkVaultUSDC = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPUSDC);
+        sparkVaultETH  = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPETH);
 
         admin        = makeAddr("admin");
         relayer      = makeAddr("relayer");
@@ -51,74 +57,129 @@ contract TestBase is Test {
 
         vm.prank(admin);
         savingsVaultIntents.updateVaultConfig(
-            address(vault),
+            address(sparkVaultUSDC),
             true,
-            MIN_INTENT_ASSETS,
-            MAX_INTENT_ASSETS
+            MIN_INTENT_ASSETS_USDC,
+            MAX_INTENT_ASSETS_USDC
         );
 
-        // User deposits assets into vault
-        userShares = _depositToVault(user, DEPOSIT_AMOUNT);
+        vm.prank(admin);
+        savingsVaultIntents.updateVaultConfig(
+            address(sparkVaultETH),
+            true,
+            MIN_INTENT_ASSETS_ETH,
+            MAX_INTENT_ASSETS_ETH
+        );
 
-        // Vault totalSupply at _getBlock() + above user deposit
-        vaultInitialTotalSupply = vault.totalSupply();
+        // User deposits assets into vaults
+
+        userSpUSDCShares = _depositToVault(user, sparkVaultUSDC, DEPOSIT_AMOUNT_USDC);
+        userSpETHShares  = _depositToVault(user, sparkVaultETH,  DEPOSIT_AMOUNT_ETH);
+
+        // Vaults totalSupply at _getBlock() + above user deposit
+
+        sparkVaultUSDCInitSupply = sparkVaultUSDC.totalSupply();
+        sparkVaultETHInitSupply  = sparkVaultETH.totalSupply();
     }
 
     function _getBlock() internal virtual pure returns (uint256) {
         return 24319071; //  January 26, 2026
     }
 
-    function _drainVaultBalance() internal virtual {
-        uint256 vaultBalance = underlyingAsset.balanceOf(address(vault));
+    function _drainVaultBalance(IERC4626Like vault) internal virtual {
+        uint256 vaultBalance = IERC20Like(vault.asset()).balanceOf(address(vault));
 
         vm.prank(Ethereum.ALM_PROXY);
         IVaultLike(address(vault)).take(vaultBalance);
     }
 
-    function _fundVaultBalance(uint256 amount_) internal {
-        deal(address(underlyingAsset), address(vault), amount_);
+    function _fundVaultBalance(IERC4626Like vault, uint256 amount_) internal {
+        deal(vault.asset(), address(vault), amount_);
     }
 
-    function _depositToVault(address account, uint256 assets) internal returns (uint256 shares) {
-        deal(address(underlyingAsset), account, assets);
+    function _depositToVault(
+        address      account,
+        IERC4626Like vault,
+        uint256      assets
+    )
+        internal
+        returns (uint256 shares)
+    {
+        address underlyingAsset = vault.asset();
+
+        deal(underlyingAsset, account, assets);
 
         vm.prank(account);
-        underlyingAsset.approve(address(vault), assets);
+        IERC20Like(underlyingAsset).approve(address(vault), assets);
 
         vm.prank(account);
         shares = vault.deposit(assets, account);
     }
 
+    function _approveAndCreateRequest(
+        address      account,
+        IERC4626Like vault,
+        uint256      shares_,
+        uint256      deadline_
+    )
+        internal 
+        returns (uint256 requestId) 
+    {
+        // Approve the transfer.
+        vm.prank(account);
+        vault.approve(address(savingsVaultIntents), shares_);
+
+        // Create request
+        requestId = _createRequest(account, vault, shares_, deadline_);
+    }
+
+    function _createRequest(
+        address      account,
+        IERC4626Like vault,
+        uint256      shares_,
+        uint256      deadline_
+    )
+        internal 
+        returns (uint256 requestId) 
+    {
+        // Create request
+        vm.prank(account);
+        requestId = savingsVaultIntents.request({
+            vault     : address(vault),
+            shares    : shares_,
+            recipient : account,
+            deadline  : deadline_
+        });
+    }
+
     function _assertRequest(
-        address account,
-        uint256 expectedRequestId,
-        address expectedVault,
-        uint256 expectedShares,
-        address expectedRecipient,
-        uint256 expectedDeadline
+        address      account,
+        IERC4626Like vault,
+        uint256      expectedRequestId,
+        uint256      expectedShares,
+        address      expectedRecipient,
+        uint256      expectedDeadline
     )
         internal view
     {
         ( 
             uint256 requestId_,
-            address vault_,
             uint256 shares_,
             address recipient_,
             uint256 deadline_
-        ) = savingsVaultIntents.withdrawRequests(account);
+        ) = savingsVaultIntents.withdrawRequests(account, address(vault));
 
         assertEq(requestId_, expectedRequestId);
-        assertEq(vault_,     expectedVault);
         assertEq(shares_,    expectedShares);
         assertEq(recipient_, expectedRecipient);
         assertEq(deadline_,  expectedDeadline);
     }
 
-    function _assertEmptyRequest(address account) internal view {
+    function _assertEmptyRequest(address account, IERC4626Like vault) internal view {
         _assertRequest({
             account           : account,
+            vault             : vault,
             expectedRequestId : 0,
-            expectedVault     : address(0),
             expectedShares    : 0,
             expectedRecipient : address(0),
             expectedDeadline  : 0
