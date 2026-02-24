@@ -15,7 +15,9 @@ interface IERC4626Like {
 
     function deposit(uint256 assets, address receiver) external returns (uint256 shares);
 
-    function redeem(uint256 shares, address receiver, address owner) external returns (uint256 assets);
+    function redeem(uint256 shares, address receiver, address owner)
+        external
+        returns (uint256 assets);
 
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 

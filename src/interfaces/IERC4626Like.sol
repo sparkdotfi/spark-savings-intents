@@ -3,11 +3,9 @@ pragma solidity ^0.8.27;
 
 interface IERC4626Like {
 
-    function redeem(
-        uint256 shares,
-        address receiver,
-        address owner
-    ) external returns (uint256 assets);
+    function redeem(uint256 shares, address receiver, address owner)
+        external 
+        returns (uint256 assets);
 
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 

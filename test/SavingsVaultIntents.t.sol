@@ -272,7 +272,7 @@ contract RequestTests is TestBase {
 
     // Failure tests
 
-    function test_request_vaultNotWhitelisted() public {
+    function test_request_vaultNotWhitelisted() external {
         vm.expectRevert(ISavingsVaultIntents.VaultNotWhitelisted.selector);
         vm.prank(user);
         savingsVaultIntents.request({
@@ -283,7 +283,7 @@ contract RequestTests is TestBase {
         });
     }
 
-    function test_request_invalidRecipientAddress() public {
+    function test_request_invalidRecipientAddress() external {
         vm.expectRevert(ISavingsVaultIntents.InvalidRecipientAddress.selector);
         vm.prank(user);
         savingsVaultIntents.request({
@@ -385,7 +385,7 @@ contract RequestTests is TestBase {
         });
     }
 
-    function test_request_invalidDeadlineBoundary_deadlineTooLow() public {
+    function test_request_invalidDeadlineBoundary_deadlineTooLow() external {
         uint256 maxDeadline = savingsVaultIntents.maxDeadline();
 
         vm.expectRevert(
@@ -413,7 +413,7 @@ contract RequestTests is TestBase {
         });
     }
 
-    function test_request_invalidDeadlineBoundary_deadlineTooHigh() public {
+    function test_request_invalidDeadlineBoundary_deadlineTooHigh() external {
         uint256 maxDeadline = savingsVaultIntents.maxDeadline();
 
         vm.expectRevert(
@@ -443,7 +443,7 @@ contract RequestTests is TestBase {
 
     // Success tests
 
-    function test_request() public {
+    function test_request() external {
         _assertEmptyRequest(user, sparkVaultUSDC);
 
         assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
@@ -480,7 +480,7 @@ contract RequestTests is TestBase {
         });
     }
 
-    function test_request_multipleVaults() public {
+    function test_request_multipleVaults() external {
         _assertEmptyRequest(user, sparkVaultUSDC);
         _assertEmptyRequest(user, sparkVaultETH);
 
@@ -532,7 +532,7 @@ contract RequestTests is TestBase {
         });
     }
 
-    function test_request_overwriteRequest() public {
+    function test_request_overwriteRequest() external {
         _assertEmptyRequest(user, sparkVaultUSDC);
 
         assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
@@ -582,7 +582,7 @@ contract RequestTests is TestBase {
         });
     }
 
-    function test_request_multipleVaults_overwriteIsolation() public {
+    function test_request_multipleVaults_overwriteIsolation() external {
         _assertEmptyRequest(user, sparkVaultUSDC);
         _assertEmptyRequest(user, sparkVaultETH);
 
@@ -676,7 +676,7 @@ contract CancelTests is TestBase {
 
     // Failure tests
 
-    function test_cancel_requestNotFound() public {
+    function test_cancel_requestNotFound() external {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.RequestNotFound.selector,
@@ -711,7 +711,7 @@ contract CancelTests is TestBase {
 
     // Success tests
 
-    function test_cancel() public {
+    function test_cancel() external {
         assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
 
         uint256 requestId = _createRequest(
@@ -747,7 +747,7 @@ contract CancelTests is TestBase {
         _assertEmptyRequest(user, sparkVaultUSDC);
     }
 
-    function test_cancel_afterRequestOverwrite() public {
+    function test_cancel_afterRequestOverwrite() external {
         uint256 requestId = _createRequest(
             user,
             sparkVaultUSDC,
@@ -948,7 +948,7 @@ contract FulfillTests is TestBase {
         savingsVaultIntents.fulfill(user, address(sparkVaultETH), requestId);
     }
 
-    function test_fulfill_requestNotFoundRaceCondition() public {
+    function test_fulfill_requestNotFoundRaceCondition() external {
         // User creates request A
         uint256 requestA = _approveAndCreateRequest(
             user,
@@ -991,7 +991,7 @@ contract FulfillTests is TestBase {
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestB);
     }
 
-    function test_fulfill_deadlineExceededBoundary() public {
+    function test_fulfill_deadlineExceededBoundary() external {
         uint256 deadline = block.timestamp + 10;
 
         uint256 requestId = _approveAndCreateRequest(
@@ -1024,7 +1024,7 @@ contract FulfillTests is TestBase {
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
     }
 
-    function test_fulfill_noSharesAllowance() public {
+    function test_fulfill_noSharesAllowance() external {
         // Creating intent request without approval of shares
         uint256 requestId = _createRequest(
             user,

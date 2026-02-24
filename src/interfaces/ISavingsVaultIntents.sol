@@ -104,9 +104,7 @@ interface ISavingsVaultIntents {
 
     function RELAYER() external view returns (bytes32 relayer);
 
-    function vaultConfig(
-        address vault
-    )
+    function vaultConfig(address vault)
         external
         view
         returns (
@@ -117,10 +115,7 @@ interface ISavingsVaultIntents {
 
     function vaultRequestCount(address vault) external view returns (uint256 requestCount);
 
-    function withdrawRequests(
-        address account,
-        address vault
-    )
+    function withdrawRequests(address account, address vault)
         external
         view
         returns (
