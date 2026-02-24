@@ -338,6 +338,62 @@ contract RequestTests is TestBase {
         vm.stopPrank();
     }
 
+    function test_request_invalidDeadlineBoundary_deadlineTooLow() external {
+        uint256 maxDeadline = savingsVaultIntents.maxDeadline();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.InvalidDeadline.selector,
+                maxDeadline,
+                block.timestamp
+            )
+        );
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(sparkVaultUSDC),
+            shares    : userSpUSDCShares,
+            recipient : user,
+            deadline  : block.timestamp
+        });
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(sparkVaultUSDC),
+            shares    : userSpUSDCShares,
+            recipient : user,
+            deadline  : block.timestamp + 1
+        });
+    }
+
+    function test_request_invalidDeadlineBoundary_deadlineTooHigh() external {
+        uint256 maxDeadline = savingsVaultIntents.maxDeadline();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.InvalidDeadline.selector,
+                maxDeadline,
+                block.timestamp + maxDeadline + 1
+            )
+        );
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(sparkVaultUSDC),
+            shares    : userSpUSDCShares,
+            recipient : user,
+            deadline  : block.timestamp + maxDeadline + 1
+        });
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(sparkVaultUSDC),
+            shares    : userSpUSDCShares,
+            recipient : user,
+            deadline  : block.timestamp + maxDeadline
+        });
+    }
+
     function test_request_insufficientSharesBoundary() external {
         uint256 sharesAtBoundary   = userSpUSDCShares;
         uint256 sharesOverBoundary = userSpUSDCShares + 1;
@@ -403,62 +459,6 @@ contract RequestTests is TestBase {
             shares    : userSpUSDCShares,
             recipient : user,
             deadline  : block.timestamp + 100
-        });
-    }
-
-    function test_request_invalidDeadlineBoundary_deadlineTooLow() external {
-        uint256 maxDeadline = savingsVaultIntents.maxDeadline();
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ISavingsVaultIntents.InvalidDeadline.selector,
-                maxDeadline,
-                block.timestamp
-            )
-        );
-
-        vm.prank(user);
-        savingsVaultIntents.request({
-            vault     : address(sparkVaultUSDC),
-            shares    : userSpUSDCShares,
-            recipient : user,
-            deadline  : block.timestamp
-        });
-
-        vm.prank(user);
-        savingsVaultIntents.request({
-            vault     : address(sparkVaultUSDC),
-            shares    : userSpUSDCShares,
-            recipient : user,
-            deadline  : block.timestamp + 1
-        });
-    }
-
-    function test_request_invalidDeadlineBoundary_deadlineTooHigh() external {
-        uint256 maxDeadline = savingsVaultIntents.maxDeadline();
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ISavingsVaultIntents.InvalidDeadline.selector,
-                maxDeadline,
-                block.timestamp + maxDeadline + 1
-            )
-        );
-
-        vm.prank(user);
-        savingsVaultIntents.request({
-            vault     : address(sparkVaultUSDC),
-            shares    : userSpUSDCShares,
-            recipient : user,
-            deadline  : block.timestamp + maxDeadline + 1
-        });
-
-        vm.prank(user);
-        savingsVaultIntents.request({
-            vault     : address(sparkVaultUSDC),
-            shares    : userSpUSDCShares,
-            recipient : user,
-            deadline  : block.timestamp + maxDeadline
         });
     }
 
