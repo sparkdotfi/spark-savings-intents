@@ -109,7 +109,7 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
 
         uint256 allowance = IERC4626Like(vault).allowance(msg.sender, address(this));
 
-        require(allowance >= shares, InsufficientAllowance(shares, allowance));
+        require(shares <= allowance, InsufficientAllowance(shares, allowance));
 
         requestId = ++vaultRequestCount[vault];
 

@@ -424,39 +424,35 @@ contract RequestTests is TestBase {
     }
 
     function test_request_insufficientAllowanceBoundary() external {
-        uint256 allowanceAtBoundary    = userSpUSDCShares;
-        uint256 allowanceUnderBoundary = userSpUSDCShares - 1;
+        uint256 sharesAtBoundary   = userSpUSDCShares;
+        uint256 sharesOverBoundary = userSpUSDCShares + 1;
 
-        // Request creation should revert if the user's approval is less than the required allowance
+        // Request creation should revert if user is requesting more shares than allowance
 
-        vm.prank(user);
-        sparkVaultUSDC.approve(address(savingsVaultIntents), allowanceUnderBoundary);
+        _depositToVault(user, sparkVaultUSDC, 2); // Add 2 (rounding) more assets for sharesOverBoundary 
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.InsufficientAllowance.selector,
-                userSpUSDCShares,
-                allowanceUnderBoundary
+                sharesOverBoundary,
+                userSpUSDCShares
             )
         );
 
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(sparkVaultUSDC),
-            shares    : userSpUSDCShares,
+            shares    : sharesOverBoundary,
             recipient : user,
             deadline  : block.timestamp + 100
         });
 
-        // Request creation should succeed if the user's approval is equal to the required allowance
-
-        vm.prank(user);
-        sparkVaultUSDC.approve(address(savingsVaultIntents), allowanceAtBoundary);
+        // Request creation should succeed if user is requesting shares equal to allowance
 
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(sparkVaultUSDC),
-            shares    : userSpUSDCShares,
+            shares    : sharesAtBoundary,
             recipient : user,
             deadline  : block.timestamp + 100
         });
@@ -793,7 +789,7 @@ contract CancelTests is TestBase {
         requestId = _createRequest(
             user,
             sparkVaultUSDC,
-            userSpUSDCShares/2,
+            userSpUSDCShares / 2,
             block.timestamp + 200
         );
     
@@ -805,7 +801,7 @@ contract CancelTests is TestBase {
             account           : user,
             vault             : sparkVaultUSDC,
             expectedRequestId : requestId,
-            expectedShares    : userSpUSDCShares/2,
+            expectedShares    : userSpUSDCShares / 2,
             expectedRecipient : user,
             expectedDeadline  : block.timestamp + 200
         });
@@ -986,7 +982,7 @@ contract FulfillTests is TestBase {
         uint256 requestB = _createRequest(
             user,
             sparkVaultUSDC,
-            userSpUSDCShares/2,
+            userSpUSDCShares / 2,
             block.timestamp + 100
         );
 
