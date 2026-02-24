@@ -27,7 +27,7 @@ contract InvariantsBase is Test {
     address relayer = makeAddr("relayer");
 
     function setUp() public virtual {
-        vault = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPUSDC);
+        vault           = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPUSDC);
         underlyingAsset = IERC20Like(vault.asset());
 
         savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days);

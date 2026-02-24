@@ -12,7 +12,7 @@ contract Invariants is InvariantsBase {
         super.setUp();
 
         adminHandler = new AdminHandler(address(vault), address(savingsVaultIntents));
-        userHandler  = new UserHandler(address(vault), address(savingsVaultIntents), 25);
+        userHandler  = new UserHandler(address(vault),  address(savingsVaultIntents), 25);
 
         // Foundry will call only the functions of the target contracts
         targetContract(address(adminHandler));
