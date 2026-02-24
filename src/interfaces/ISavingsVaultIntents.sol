@@ -89,9 +89,11 @@ interface ISavingsVaultIntents {
     /*** External functions                                                                     ***/
     /**********************************************************************************************/
 
-    function cancel(address vault) external;
+    function cancel(address vault) external returns (uint256 requestId);
 
     function fulfill(address account, address vault, uint256 requestId) external;
+
+    function maxDeadline() external view returns (uint256 maxDeadline);
 
     function request(
         address vault,
@@ -99,5 +101,33 @@ interface ISavingsVaultIntents {
         address recipient,
         uint256 deadline
     ) external returns (uint256 requestId);
+
+    function RELAYER() external view returns (bytes32 relayer);
+
+    function vaultConfig(
+        address vault
+    )
+        external
+        view
+        returns (
+            bool    whitelisted,
+            uint256 minIntentAssets,
+            uint256 maxIntentAssets
+        );
+
+    function vaultRequestCount(address vault) external view returns (uint256 requestCount);
+
+    function withdrawRequests(
+        address account,
+        address vault
+    )
+        external
+        view
+        returns (
+            uint256 requestId,
+            uint256 shares,
+            address recipient,
+            uint256 deadline
+        );
 
 }

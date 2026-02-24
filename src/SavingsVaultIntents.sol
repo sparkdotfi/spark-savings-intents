@@ -16,16 +16,16 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
 
     uint256 public maxDeadline;
 
-    mapping(address vault => VaultConfig) public vaultConfig;
-    mapping(address vault => uint256)     public vaultRequestCount;
+    mapping(address vault => VaultConfig config)   public vaultConfig;
+    mapping(address vault => uint256 requestCount) public vaultRequestCount;
 
-    mapping(address account => mapping(address vault => WithdrawRequest)) public withdrawRequests;
+    mapping(address account => mapping(address vault => WithdrawRequest request)) public withdrawRequests;
 
     constructor(address admin, address relayer, uint256 maxDeadline_) {
         require(admin   != address(0), InvalidAdminAddress());
         require(relayer != address(0), InvalidRelayerAddress());
 
-        require(maxDeadline_ > 0, InvalidMaxDeadline());
+        require(maxDeadline_ != 0, InvalidMaxDeadline());
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(RELAYER,            relayer);
@@ -38,7 +38,7 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     /**********************************************************************************************/
 
     function setMaxDeadline(uint256 maxDeadline_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(maxDeadline_ > 0, InvalidMaxDeadline());
+        require(maxDeadline_ != 0, InvalidMaxDeadline());
 
         maxDeadline = maxDeadline_;
 
@@ -103,7 +103,7 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
         require(shares <= userShares, InsufficientShares(shares, userShares));
 
         require(
-            deadline > block.timestamp && deadline <= block.timestamp + maxDeadline,
+            deadline >= block.timestamp && deadline <= block.timestamp + maxDeadline,
             InvalidDeadline(maxDeadline, deadline)
         );
 
@@ -119,20 +119,20 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
         emit RequestCreated(msg.sender, vault, requestId, shares, recipient, deadline);
     }
 
-    function cancel(address vault) external {
-        WithdrawRequest memory request_ = withdrawRequests[msg.sender][vault];
+    function cancel(address vault) external returns (uint256 requestId) {
+        requestId = withdrawRequests[msg.sender][vault].requestId;
 
-        require(request_.requestId != 0, RequestNotFound(msg.sender, vault));
+        require(requestId != 0, RequestNotFound(msg.sender, vault));
 
         delete withdrawRequests[msg.sender][vault];
 
-        emit RequestCancelled(msg.sender, vault, request_.requestId);
+        emit RequestCancelled(msg.sender, vault, requestId);
     }
 
     function fulfill(
         address account,
         address vault,
-        uint256 requestId_
+        uint256 requestId
     )
         external
         onlyRole(RELAYER)
@@ -140,7 +140,7 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
         WithdrawRequest memory request_ = withdrawRequests[account][vault];
 
         require(
-            requestId_ != 0 && request_.requestId == requestId_,
+            requestId != 0 && request_.requestId == requestId,
             RequestNotFound(account, vault)
         );
 

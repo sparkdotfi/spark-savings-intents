@@ -24,8 +24,9 @@ contract TestBase is Test {
 
     IERC4626Like internal sparkVaultUSDC;
     IERC4626Like internal sparkVaultETH;
-    uint256      internal sparkVaultUSDCInitSupply;
-    uint256      internal sparkVaultETHInitSupply;
+
+    uint256 internal sparkVaultUSDCInitSupply;
+    uint256 internal sparkVaultETHInitSupply;
 
     bytes32 internal defaultAdminRole;
     bytes32 internal relayerRole;
@@ -33,8 +34,8 @@ contract TestBase is Test {
     address internal admin;
     address internal relayer;
     address internal unauthorized;
-
     address internal user;
+
     uint256 internal userSpUSDCShares;
     uint256 internal userSpETHShares;
 
@@ -53,8 +54,7 @@ contract TestBase is Test {
 
         savingsVaultIntents = new SavingsVaultIntents(admin, relayer, 1 days);
 
-        // Initial setup of savingsVaultIntents by admin
-
+        // Whitelisting sparkVaultUSDC
         vm.prank(admin);
         savingsVaultIntents.updateVaultConfig(
             address(sparkVaultUSDC),
@@ -63,6 +63,7 @@ contract TestBase is Test {
             MAX_INTENT_ASSETS_USDC
         );
 
+        // Whitelisting sparkVaultETH
         vm.prank(admin);
         savingsVaultIntents.updateVaultConfig(
             address(sparkVaultETH),

@@ -64,13 +64,10 @@ contract SetMaxDeadlineTests is TestBase {
         savingsVaultIntents.setMaxDeadline(2 days);
     }
 
-    function test_setMaxDeadline_invalidMaxDeadlineBoundary() external {
+    function test_setMaxDeadline_invalidMaxDeadline() external {
         vm.expectRevert(ISavingsVaultIntents.InvalidMaxDeadline.selector);
         vm.prank(admin);
         savingsVaultIntents.setMaxDeadline(0);
-
-        vm.prank(admin);
-        savingsVaultIntents.setMaxDeadline(1);
     }
 
     // Success tests
@@ -121,7 +118,7 @@ contract UpdateVaultConfigTests is TestBase {
         vm.prank(unauthorized);
         savingsVaultIntents.updateVaultConfig(
             address(sparkVaultUSDC),
-            true,
+            false,
             MIN_INTENT_ASSETS_USDC,
             MAX_INTENT_ASSETS_USDC
         );
@@ -136,18 +133,28 @@ contract UpdateVaultConfigTests is TestBase {
             MIN_INTENT_ASSETS_USDC,
             MAX_INTENT_ASSETS_USDC
         );
+    }
 
-        vm.expectRevert(ISavingsVaultIntents.InvalidVaultAddress.selector);
+    function test_updateVaultConfig_invalidIntentAmountBoundsEqualBounds() external {
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.InvalidIntentAmountBounds.selector,
+                0,
+                0
+            )
+        );
+
         vm.prank(admin);
         savingsVaultIntents.updateVaultConfig(
-            address(0),
+            address(sparkVaultUSDC),
             true,
-            MIN_INTENT_ASSETS_USDC,
-            MAX_INTENT_ASSETS_USDC
+            0,
+            0
         );
     }
 
-    function test_updateVaultConfig_invalidIntentAmountBoundsBoundary() external {
+    function test_updateVaultConfig_invalidIntentAmountBoundsMinGreaterMax() external {
+        // Max intent assets can never become zero
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.InvalidIntentAmountBounds.selector,
@@ -167,8 +174,8 @@ contract UpdateVaultConfigTests is TestBase {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.InvalidIntentAmountBounds.selector,
-                0,
-                0
+                MAX_INTENT_ASSETS_USDC,
+                MIN_INTENT_ASSETS_USDC
             )
         );
 
@@ -176,24 +183,8 @@ contract UpdateVaultConfigTests is TestBase {
         savingsVaultIntents.updateVaultConfig(
             address(sparkVaultUSDC),
             true,
-            0,
-            0
-        );
-
-        vm.prank(admin);
-        savingsVaultIntents.updateVaultConfig(
-            address(sparkVaultUSDC),
-            true,
-            0,
-            1
-        );
-
-        vm.prank(admin);
-        savingsVaultIntents.updateVaultConfig(
-            address(sparkVaultUSDC),
-            false,
-            0,
-            1
+            MAX_INTENT_ASSETS_USDC,
+            MIN_INTENT_ASSETS_USDC
         );
     }
 
@@ -252,16 +243,16 @@ contract UpdateVaultConfigTests is TestBase {
         emit ISavingsVaultIntents.VaultConfigUpdated(
             makeAddr("newVault"),
             true,
-            MIN_INTENT_ASSETS_USDC,
-            MAX_INTENT_ASSETS_USDC
+            100_000e18,
+            100_000_000e18
         );
 
         vm.prank(admin);
         savingsVaultIntents.updateVaultConfig(
             makeAddr("newVault"),
             true,
-            MIN_INTENT_ASSETS_USDC,
-            MAX_INTENT_ASSETS_USDC
+            100_000e18,
+            100_000_000e18
         );
 
         (
@@ -271,8 +262,8 @@ contract UpdateVaultConfigTests is TestBase {
         ) = savingsVaultIntents.vaultConfig(makeAddr("newVault"));
 
         assertEq(whitelisted,     true);
-        assertEq(minIntentAssets, MIN_INTENT_ASSETS_USDC);
-        assertEq(maxIntentAssets, MAX_INTENT_ASSETS_USDC);
+        assertEq(minIntentAssets, 100_000e18);
+        assertEq(maxIntentAssets, 100_000_000e18);
     }
 
 }
@@ -286,7 +277,7 @@ contract RequestTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(0),
-            shares    : userSpUSDCShares,
+            shares    : 1e18,
             recipient : user,
             deadline  : block.timestamp + 100
         });
@@ -304,22 +295,22 @@ contract RequestTests is TestBase {
     }
 
     function test_request_intentAssetsBelowMinBoundary() external {
-        uint256 minIntentSharesAtBoundary    = sparkVaultUSDC.convertToShares(MIN_INTENT_ASSETS_USDC) + 1; // Rounding
-        uint256 minIntentSharesUnderBoundary = minIntentSharesAtBoundary - 1;
-        uint256 minIntentAssetsUnderBoundary = sparkVaultUSDC.convertToAssets(minIntentSharesUnderBoundary);
+        uint256 sharesAtMin    = sparkVaultUSDC.convertToShares(MIN_INTENT_ASSETS_USDC) + 1; // Rounding
+        uint256 sharesBelowMin = sharesAtMin - 1;
+        uint256 assetsBelowMin = sparkVaultUSDC.convertToAssets(sharesBelowMin);
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.IntentAssetsBelowMin.selector,
                 MIN_INTENT_ASSETS_USDC,
-                minIntentAssetsUnderBoundary
+                assetsBelowMin
             )
         );
 
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(sparkVaultUSDC),
-            shares    : minIntentSharesUnderBoundary,
+            shares    : sharesBelowMin,
             recipient : user,
             deadline  : block.timestamp + 100
         });
@@ -327,16 +318,16 @@ contract RequestTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(sparkVaultUSDC),
-            shares    : minIntentSharesAtBoundary,
+            shares    : sharesAtMin,
             recipient : user,
             deadline  : block.timestamp + 100
         });
     }
 
     function test_request_intentAssetsAboveMaxBoundary() external {
-        uint256 maxIntentSharesAtBoundary    = sparkVaultUSDC.convertToShares(MAX_INTENT_ASSETS_USDC) + 1; // Rounding
-        uint256 maxIntentSharesAboveBoundary = maxIntentSharesAtBoundary + 1;
-        uint256 maxIntentAssetsAboveBoundary = sparkVaultUSDC.convertToAssets(maxIntentSharesAboveBoundary);
+        uint256 sharesAtMax    = sparkVaultUSDC.convertToShares(MAX_INTENT_ASSETS_USDC) + 1; // Rounding
+        uint256 sharesAbovemax = sharesAtMax + 1;
+        uint256 assetsAboveMax = sparkVaultUSDC.convertToAssets(sharesAbovemax);
 
         _depositToVault(user, sparkVaultUSDC, MAX_INTENT_ASSETS_USDC + 1);
 
@@ -344,14 +335,14 @@ contract RequestTests is TestBase {
             abi.encodeWithSelector(
                 ISavingsVaultIntents.IntentAssetsAboveMax.selector,
                 MAX_INTENT_ASSETS_USDC,
-                maxIntentAssetsAboveBoundary
+                assetsAboveMax
             )
         );
 
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(sparkVaultUSDC),
-            shares    : maxIntentSharesAboveBoundary,
+            shares    : sharesAbovemax,
             recipient : user,
             deadline  : block.timestamp + 100
         });
@@ -359,20 +350,20 @@ contract RequestTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(sparkVaultUSDC),
-            shares    : maxIntentSharesAtBoundary,
+            shares    : sharesAtMax,
             recipient : user,
             deadline  : block.timestamp + 100
         });
     }
 
     function test_request_insufficientSharesBoundary() external {
-        uint256 requestedSharesAtBoundary   = userSpUSDCShares;
-        uint256 requestedSharesOverBoundary = userSpUSDCShares + 1;
+        uint256 sharesAtBoundary   = userSpUSDCShares;
+        uint256 sharesOverBoundary = userSpUSDCShares + 1;
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.InsufficientShares.selector,
-                requestedSharesOverBoundary,
+                sharesOverBoundary,
                 userSpUSDCShares
             )
         );
@@ -380,7 +371,7 @@ contract RequestTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(sparkVaultUSDC),
-            shares    : requestedSharesOverBoundary,
+            shares    : sharesOverBoundary,
             recipient : user,
             deadline  : block.timestamp + 100
         });
@@ -388,7 +379,7 @@ contract RequestTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(sparkVaultUSDC),
-            shares    : requestedSharesAtBoundary,
+            shares    : sharesAtBoundary,
             recipient : user,
             deadline  : block.timestamp + 100
         });
@@ -401,7 +392,7 @@ contract RequestTests is TestBase {
             abi.encodeWithSelector(
                 ISavingsVaultIntents.InvalidDeadline.selector,
                 maxDeadline,
-                block.timestamp
+                block.timestamp - 1
             )
         );
 
@@ -410,7 +401,7 @@ contract RequestTests is TestBase {
             vault     : address(sparkVaultUSDC),
             shares    : userSpUSDCShares,
             recipient : user,
-            deadline  : block.timestamp
+            deadline  : block.timestamp - 1
         });
 
         vm.prank(user);
@@ -418,7 +409,7 @@ contract RequestTests is TestBase {
             vault     : address(sparkVaultUSDC),
             shares    : userSpUSDCShares,
             recipient : user,
-            deadline  : block.timestamp + 1
+            deadline  : block.timestamp
         });
     }
 
@@ -489,77 +480,7 @@ contract RequestTests is TestBase {
         });
     }
 
-    function test_request_overwriteRequest() public {
-        _assertEmptyRequest(user, sparkVaultUSDC);
-
-        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
-
-        vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.RequestCreated({
-            account   : user,
-            vault     : address(sparkVaultUSDC),
-            requestId : 1,
-            shares    : userSpUSDCShares,
-            recipient : user,
-            deadline  : block.timestamp + 100
-        });
-
-        vm.prank(user);
-        uint256 requestId = savingsVaultIntents.request({
-            vault     : address(sparkVaultUSDC),
-            shares    : userSpUSDCShares,
-            recipient : user,
-            deadline  : block.timestamp + 100
-        });
-
-        assertEq(requestId, 1);
-
-        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
-
-        _assertRequest({
-            account           : user,
-            vault             : sparkVaultUSDC,
-            expectedRequestId : requestId,
-            expectedShares    : userSpUSDCShares,
-            expectedRecipient : user,
-            expectedDeadline  : block.timestamp + 100
-        });
-
-        // Overwriting request 1 with userShares - 10
-
-        vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.RequestCreated({
-            account   : user,
-            vault     : address(sparkVaultUSDC),
-            requestId : 2,
-            shares    : userSpUSDCShares - 10,
-            recipient : user,
-            deadline  : block.timestamp + 200
-        });
-
-        vm.prank(user);
-        requestId = savingsVaultIntents.request({
-            vault     : address(sparkVaultUSDC),
-            shares    : userSpUSDCShares - 10,
-            recipient : user,
-            deadline  : block.timestamp + 200
-        });
-
-        assertEq(requestId, 2);
-
-        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 2);
-
-        _assertRequest({
-            account           : user,
-            vault             : sparkVaultUSDC,
-            expectedRequestId : requestId,
-            expectedShares    : userSpUSDCShares - 10,
-            expectedRecipient : user,
-            expectedDeadline  : block.timestamp + 200
-        });
-    }
-
-    function test_request_multipleVaults_perVaultRequestCountIsolation() public {
+    function test_request_multipleVaults() public {
         _assertEmptyRequest(user, sparkVaultUSDC);
         _assertEmptyRequest(user, sparkVaultETH);
 
@@ -567,16 +488,6 @@ contract RequestTests is TestBase {
         assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)),  0);
 
         // Create request for sparkVaultUSDC
-
-        vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.RequestCreated({
-            account   : user,
-            vault     : address(sparkVaultUSDC),
-            requestId : 1,
-            shares    : userSpUSDCShares,
-            recipient : user,
-            deadline  : block.timestamp + 100
-        });
 
         vm.prank(user);
         uint256 requestIdVaultUSDC = savingsVaultIntents.request({
@@ -588,15 +499,107 @@ contract RequestTests is TestBase {
 
         // Create request for sparkVaultETH
 
-        vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.RequestCreated({
-            account   : user,
+        vm.prank(user);
+        uint256 requestIdVaultETH = savingsVaultIntents.request({
             vault     : address(sparkVaultETH),
-            requestId : 1,
             shares    : userSpETHShares,
             recipient : user,
             deadline  : block.timestamp + 200
         });
+
+        assertEq(requestIdVaultUSDC, 1);
+        assertEq(requestIdVaultETH,  1);
+
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)),  1);
+
+        _assertRequest({
+            account           : user,
+            vault             : sparkVaultUSDC,
+            expectedRequestId : requestIdVaultUSDC,
+            expectedShares    : userSpUSDCShares,
+            expectedRecipient : user,
+            expectedDeadline  : block.timestamp + 100
+        });
+
+        _assertRequest({
+            account           : user,
+            vault             : sparkVaultETH,
+            expectedRequestId : requestIdVaultETH,
+            expectedShares    : userSpETHShares,
+            expectedRecipient : user,
+            expectedDeadline  : block.timestamp + 200
+        });
+    }
+
+    function test_request_overwriteRequest() public {
+        _assertEmptyRequest(user, sparkVaultUSDC);
+
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
+
+        vm.prank(user);
+        uint256 requestIdA = savingsVaultIntents.request({
+            vault     : address(sparkVaultUSDC),
+            shares    : userSpUSDCShares,
+            recipient : user,
+            deadline  : block.timestamp + 100
+        });
+
+        assertEq(requestIdA, 1);
+
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
+
+        _assertRequest({
+            account           : user,
+            vault             : sparkVaultUSDC,
+            expectedRequestId : requestIdA,
+            expectedShares    : userSpUSDCShares,
+            expectedRecipient : user,
+            expectedDeadline  : block.timestamp + 100
+        });
+
+        // Overwriting request A with userShares - 10
+
+        vm.prank(user);
+        uint256 requestIdB = savingsVaultIntents.request({
+            vault     : address(sparkVaultUSDC),
+            shares    : userSpUSDCShares - 10,
+            recipient : user,
+            deadline  : block.timestamp + 200
+        });
+
+        assertEq(requestIdB, 2);
+
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 2);
+
+        _assertRequest({
+            account           : user,
+            vault             : sparkVaultUSDC,
+            expectedRequestId : requestIdB,
+            expectedShares    : userSpUSDCShares - 10,
+            expectedRecipient : user,
+            expectedDeadline  : block.timestamp + 200
+        });
+    }
+
+    function test_request_multipleVaults_overwriteIsolation() public {
+        _assertEmptyRequest(user, sparkVaultUSDC);
+        _assertEmptyRequest(user, sparkVaultETH);
+
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
+        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)),  0);
+
+        // Create request for sparkVaultUSDC
+
+        vm.prank(user);
+        uint256 requestIdVaultUSDC = savingsVaultIntents.request({
+            vault     : address(sparkVaultUSDC),
+            shares    : userSpUSDCShares,
+            recipient : user,
+            deadline  : block.timestamp + 100
+        });
+
+        // Create request for sparkVaultETH
 
         vm.prank(user);
         uint256 requestIdVaultETH = savingsVaultIntents.request({
@@ -630,17 +633,7 @@ contract RequestTests is TestBase {
             expectedDeadline  : block.timestamp + 200
         });
 
-        // Overwriting request sparkVaultUSDC with userShares - 10
-
-        vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.RequestCreated({
-            account   : user,
-            vault     : address(sparkVaultUSDC),
-            requestId : 2,
-            shares    : userSpUSDCShares - 10,
-            recipient : user,
-            deadline  : block.timestamp + 200
-        });
+        // Overwriting requestIdVaultUSDC with userShares - 10
 
         vm.prank(user);
         requestIdVaultUSDC = savingsVaultIntents.request({
@@ -745,95 +738,22 @@ contract CancelTests is TestBase {
         emit ISavingsVaultIntents.RequestCancelled(user, address(sparkVaultUSDC), requestId);
 
         vm.prank(user);
-        savingsVaultIntents.cancel(address(sparkVaultUSDC));
+        uint256 cancelledRequestId = savingsVaultIntents.cancel(address(sparkVaultUSDC));
+
+        assertEq(requestId, cancelledRequestId);
 
         assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
 
         _assertEmptyRequest(user, sparkVaultUSDC);
     }
 
-    function test_cancel_multipleVaults_onlyAffectsTargetVault() public {
-        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
-        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)),  0);
-
-        uint256 requestIdVaultUSDC = _createRequest(
+    function test_cancel_afterRequestOverwrite() public {
+        uint256 requestId = _createRequest(
             user,
             sparkVaultUSDC,
             userSpUSDCShares,
             block.timestamp + 100
         );
-
-        uint256 requestIdVaultETH = _createRequest(
-            user,
-            sparkVaultETH,
-            userSpETHShares,
-            block.timestamp + 200
-        );
-
-        assertEq(requestIdVaultUSDC, 1);
-        assertEq(requestIdVaultETH,  1);
-
-        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
-        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)),  1);
-
-        _assertRequest({
-            account           : user,
-            vault             : sparkVaultUSDC,
-            expectedRequestId : requestIdVaultUSDC,
-            expectedShares    : userSpUSDCShares,
-            expectedRecipient : user,
-            expectedDeadline  : block.timestamp + 100
-        });
-
-        _assertRequest({
-            account           : user,
-            vault             : sparkVaultETH,
-            expectedRequestId : requestIdVaultETH,
-            expectedShares    : userSpETHShares,
-            expectedRecipient : user,
-            expectedDeadline  : block.timestamp + 200
-        });
-
-        // Cancelling sparkVaultUSDC request, Cancel event should have requestIdVaultUSDC
-    
-        vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.RequestCancelled(
-            user,
-            address(sparkVaultUSDC),
-            requestIdVaultUSDC
-        );
-
-        vm.prank(user);
-        savingsVaultIntents.cancel(address(sparkVaultUSDC));
-
-        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 1);
-
-        _assertEmptyRequest(user, sparkVaultUSDC);
-
-        // Request sparkVaultETH will not be affected
-
-        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultETH)),  1);
-
-        _assertRequest({
-            account           : user,
-            vault             : sparkVaultETH,
-            expectedRequestId : requestIdVaultETH,
-            expectedShares    : userSpETHShares,
-            expectedRecipient : user,
-            expectedDeadline  : block.timestamp + 200
-        });
-    }
-
-    function test_cancel_afterRequestOverwrite() public {
-        assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
-
-        vm.prank(user);
-        uint256 requestId = savingsVaultIntents.request({
-            vault     : address(sparkVaultUSDC),
-            shares    : userSpUSDCShares,
-            recipient : user,
-            deadline  : block.timestamp + 100
-        });
 
         assertEq(requestId, 1);
 
@@ -871,16 +791,83 @@ contract CancelTests is TestBase {
             expectedDeadline  : block.timestamp + 200
         });
         
-        // Cancel event will have overwritten requestId
+        // Cancel event will have overwritten requestId and requestCount doesn't change
+
         vm.expectEmit(address(savingsVaultIntents));
         emit ISavingsVaultIntents.RequestCancelled(user, address(sparkVaultUSDC), requestId);
 
         vm.prank(user);
-        savingsVaultIntents.cancel(address(sparkVaultUSDC));
+        uint256 cancelledRequestId = savingsVaultIntents.cancel(address(sparkVaultUSDC));
+
+        assertEq(requestId, cancelledRequestId);
 
         assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 2);
 
         _assertEmptyRequest(user, sparkVaultUSDC);
+    }
+
+    function test_cancel_multipleVaults_onlyAffectsTargetVault() external {
+        uint256 requestIdVaultUSDC = _createRequest(
+            user,
+            sparkVaultUSDC,
+            userSpUSDCShares,
+            block.timestamp + 100
+        );
+
+        uint256 requestIdVaultETH = _createRequest(
+            user,
+            sparkVaultETH,
+            userSpETHShares,
+            block.timestamp + 200
+        );
+
+        assertEq(requestIdVaultUSDC, 1);
+        assertEq(requestIdVaultETH,  1);
+
+        _assertRequest({
+            account           : user,
+            vault             : sparkVaultUSDC,
+            expectedRequestId : requestIdVaultUSDC,
+            expectedShares    : userSpUSDCShares,
+            expectedRecipient : user,
+            expectedDeadline  : block.timestamp + 100
+        });
+
+        _assertRequest({
+            account           : user,
+            vault             : sparkVaultETH,
+            expectedRequestId : requestIdVaultETH,
+            expectedShares    : userSpETHShares,
+            expectedRecipient : user,
+            expectedDeadline  : block.timestamp + 200
+        });
+
+        // Cancelling sparkVaultUSDC request, Cancel event should have requestIdVaultUSDC
+    
+        vm.expectEmit(address(savingsVaultIntents));
+        emit ISavingsVaultIntents.RequestCancelled(
+            user,
+            address(sparkVaultUSDC),
+            requestIdVaultUSDC
+        );
+
+        vm.prank(user);
+        uint256 cancelledRequestId = savingsVaultIntents.cancel(address(sparkVaultUSDC));
+
+        assertEq(requestIdVaultUSDC, cancelledRequestId);
+
+        _assertEmptyRequest(user, sparkVaultUSDC);
+
+        // Request sparkVaultETH will not be affected
+
+        _assertRequest({
+            account           : user,
+            vault             : sparkVaultETH,
+            expectedRequestId : requestIdVaultETH,
+            expectedShares    : userSpETHShares,
+            expectedRecipient : user,
+            expectedDeadline  : block.timestamp + 200
+        });
     }
 
 }
@@ -902,7 +889,7 @@ contract FulfillTests is TestBase {
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), 1);
     }
 
-    function test_fulfill_requestNotFound() public {
+    function test_fulfill_requestNotFound_zeroRequestId() external {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.RequestNotFound.selector,
@@ -913,32 +900,34 @@ contract FulfillTests is TestBase {
         
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), 0);
+    }
 
+    function test_fulfill_requestNotFound_noRequest() external {
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.RequestNotFound.selector,
                 user,
-                address(0)
-            )
-        );
-        
-        vm.prank(relayer);
-        savingsVaultIntents.fulfill(user, address(0), 1);
-
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ISavingsVaultIntents.RequestNotFound.selector,
-                address(0),
                 address(sparkVaultUSDC)
             )
         );
         
         vm.prank(relayer);
-        savingsVaultIntents.fulfill(address(0), address(sparkVaultUSDC), 1);
+        savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), 1);
 
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.RequestNotFound.selector,
+                user,
+                address(sparkVaultETH)
+            )
+        );
+        
+        vm.prank(relayer);
+        savingsVaultIntents.fulfill(user, address(sparkVaultETH), 1);
+    }
+
+    function test_fulfill_requestNotFound_wrongVault() external {
         // User created request for sparkVaultUSDC
-
         uint256 requestId = _approveAndCreateRequest(
             user,
             sparkVaultUSDC,
@@ -946,7 +935,7 @@ contract FulfillTests is TestBase {
             block.timestamp + 100
         );
 
-        // Fulfill of sparkVaultETH should fail
+        // Fulfill of sparkVaultETH request should fail
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.RequestNotFound.selector,
@@ -957,11 +946,6 @@ contract FulfillTests is TestBase {
         
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultETH), requestId);
-
-        // Fulfill of sparkVaultUSDC should succeed
-
-        vm.prank(relayer);
-        savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
     }
 
     function test_fulfill_requestNotFoundRaceCondition() public {
@@ -1001,7 +985,7 @@ contract FulfillTests is TestBase {
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestA);
 
-        // Relayer now trying to fulfill request B
+        // Relayer fulfilling request B should succeed
 
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestB);
@@ -1069,6 +1053,8 @@ contract FulfillTests is TestBase {
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
 
         assertEq(sparkVaultUSDC.allowance(user, address(savingsVaultIntents)), 0);
+
+        _assertEmptyRequest(user, sparkVaultUSDC);
     }
 
 
@@ -1102,6 +1088,8 @@ contract FulfillTests is TestBase {
 
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
+
+        _assertEmptyRequest(user, sparkVaultUSDC);
     }
 
     function test_fulfill_insufficientVaultFundsBoundary() external {
@@ -1134,6 +1122,8 @@ contract FulfillTests is TestBase {
 
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
+
+        _assertEmptyRequest(user, sparkVaultUSDC);
     }
 
     // Success tests
