@@ -41,6 +41,9 @@ contract ConstructorTests is TestBase {
 
         assertEq(intentInstance.hasRole(intentInstance.DEFAULT_ADMIN_ROLE(), admin_),   true);
         assertEq(intentInstance.hasRole(intentInstance.RELAYER(),            relayer_), true);
+        
+        assertEq(intentInstance.getRoleMemberCount(intentInstance.DEFAULT_ADMIN_ROLE()), 1);
+        assertEq(intentInstance.getRoleMemberCount(intentInstance.RELAYER()),            1);
 
         assertEq(intentInstance.maxDeadline(), 1 days);
     }
@@ -106,22 +109,6 @@ contract UpdateVaultConfigTests is TestBase {
             MIN_INTENT_ASSETS_USDC,
             MAX_INTENT_ASSETS_USDC
         );
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                savingsVaultIntents.DEFAULT_ADMIN_ROLE()
-            )
-        );
-
-        vm.prank(unauthorized);
-        savingsVaultIntents.updateVaultConfig(
-            address(sparkVaultUSDC),
-            false,
-            MIN_INTENT_ASSETS_USDC,
-            MAX_INTENT_ASSETS_USDC
-        );
     }
 
     function test_updateVaultConfig_invalidVaultAddress() external {
@@ -135,12 +122,13 @@ contract UpdateVaultConfigTests is TestBase {
         );
     }
 
-    function test_updateVaultConfig_invalidIntentAmountBoundsEqualBounds() external {
+    function test_updateVaultConfig_invalidIntentAmountBoundsBoundary() external {
+        // Should fail when minintentAssets > maxIntentAssets
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.InvalidIntentAmountBounds.selector,
-                0,
-                0
+                3,
+                2
             )
         );
 
@@ -148,43 +136,34 @@ contract UpdateVaultConfigTests is TestBase {
         savingsVaultIntents.updateVaultConfig(
             address(sparkVaultUSDC),
             true,
-            0,
-            0
+            3,
+            2
         );
-    }
 
-    function test_updateVaultConfig_invalidIntentAmountBoundsMinGreaterMax() external {
-        // Max intent assets can never become zero
+        // Should fail when minintentAssets == maxIntentAssets
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.InvalidIntentAmountBounds.selector,
-                1,
-                0
+                2,
+                2
             )
         );
 
+        vm.prank(admin);
+        savingsVaultIntents.updateVaultConfig(
+            address(sparkVaultUSDC),
+            true,
+            2,
+            2
+        );
+
+        // Should pass when minintentAssets < maxIntentAssets
         vm.prank(admin);
         savingsVaultIntents.updateVaultConfig(
             address(sparkVaultUSDC),
             true,
             1,
-            0
-        );
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                ISavingsVaultIntents.InvalidIntentAmountBounds.selector,
-                MAX_INTENT_ASSETS_USDC,
-                MIN_INTENT_ASSETS_USDC
-            )
-        );
-
-        vm.prank(admin);
-        savingsVaultIntents.updateVaultConfig(
-            address(sparkVaultUSDC),
-            true,
-            MAX_INTENT_ASSETS_USDC,
-            MIN_INTENT_ASSETS_USDC
+            2
         );
     }
 
@@ -276,7 +255,7 @@ contract RequestTests is TestBase {
         vm.expectRevert(ISavingsVaultIntents.VaultNotWhitelisted.selector);
         vm.prank(user);
         savingsVaultIntents.request({
-            vault     : address(0),
+            vault     : makeAddr("newVault"),
             shares    : 1e18,
             recipient : user,
             deadline  : block.timestamp + 100
@@ -326,8 +305,8 @@ contract RequestTests is TestBase {
 
     function test_request_intentAssetsAboveMaxBoundary() external {
         uint256 sharesAtMax    = sparkVaultUSDC.convertToShares(MAX_INTENT_ASSETS_USDC) + 1; // Rounding
-        uint256 sharesAbovemax = sharesAtMax + 1;
-        uint256 assetsAboveMax = sparkVaultUSDC.convertToAssets(sharesAbovemax);
+        uint256 sharesAboveMax = sharesAtMax + 1;
+        uint256 assetsAboveMax = sparkVaultUSDC.convertToAssets(sharesAboveMax);
 
         _depositToVault(user, sparkVaultUSDC, MAX_INTENT_ASSETS_USDC + 1);
 
@@ -342,18 +321,21 @@ contract RequestTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.request({
             vault     : address(sparkVaultUSDC),
-            shares    : sharesAbovemax,
+            shares    : sharesAboveMax,
             recipient : user,
             deadline  : block.timestamp + 100
         });
 
-        vm.prank(user);
+        vm.startPrank(user);
+        sparkVaultUSDC.approve(address(savingsVaultIntents), sharesAtMax);
+
         savingsVaultIntents.request({
             vault     : address(sparkVaultUSDC),
             shares    : sharesAtMax,
             recipient : user,
             deadline  : block.timestamp + 100
         });
+        vm.stopPrank();
     }
 
     function test_request_insufficientSharesBoundary() external {
@@ -385,14 +367,20 @@ contract RequestTests is TestBase {
         });
     }
 
-    function test_request_invalidDeadlineBoundary_deadlineTooLow() external {
-        uint256 maxDeadline = savingsVaultIntents.maxDeadline();
+    function test_request_insufficientAllowanceBoundary() external {
+        uint256 allowanceAtBoundary    = userSpUSDCShares;
+        uint256 allowanceUnderBoundary = userSpUSDCShares - 1;
+
+        // Request creation should revert if the user's approval is less than the required allowance
+
+        vm.prank(user);
+        sparkVaultUSDC.approve(address(savingsVaultIntents), allowanceUnderBoundary);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.InvalidDeadline.selector,
-                maxDeadline,
-                block.timestamp - 1
+                ISavingsVaultIntents.InsufficientAllowance.selector,
+                userSpUSDCShares,
+                allowanceUnderBoundary
             )
         );
 
@@ -401,8 +389,33 @@ contract RequestTests is TestBase {
             vault     : address(sparkVaultUSDC),
             shares    : userSpUSDCShares,
             recipient : user,
-            deadline  : block.timestamp - 1
+            deadline  : block.timestamp + 100
         });
+
+        // Request creation should succeed if the user's approval is equal to the required allowance
+
+        vm.prank(user);
+        sparkVaultUSDC.approve(address(savingsVaultIntents), allowanceAtBoundary);
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(sparkVaultUSDC),
+            shares    : userSpUSDCShares,
+            recipient : user,
+            deadline  : block.timestamp + 100
+        });
+    }
+
+    function test_request_invalidDeadlineBoundary_deadlineTooLow() external {
+        uint256 maxDeadline = savingsVaultIntents.maxDeadline();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.InvalidDeadline.selector,
+                maxDeadline,
+                block.timestamp
+            )
+        );
 
         vm.prank(user);
         savingsVaultIntents.request({
@@ -410,6 +423,14 @@ contract RequestTests is TestBase {
             shares    : userSpUSDCShares,
             recipient : user,
             deadline  : block.timestamp
+        });
+
+        vm.prank(user);
+        savingsVaultIntents.request({
+            vault     : address(sparkVaultUSDC),
+            shares    : userSpUSDCShares,
+            recipient : user,
+            deadline  : block.timestamp + 1
         });
     }
 
@@ -681,12 +702,12 @@ contract CancelTests is TestBase {
             abi.encodeWithSelector(
                 ISavingsVaultIntents.RequestNotFound.selector,
                 user,
-                address(0)
+                address(sparkVaultUSDC)
             )
         );
 
         vm.prank(user);
-        savingsVaultIntents.cancel(address(0));
+        savingsVaultIntents.cancel(address(sparkVaultUSDC));
 
         uint256 requestId = _createRequest(
             user,
@@ -769,14 +790,12 @@ contract CancelTests is TestBase {
         });
 
         // Overwriting request 1
-
-        vm.prank(user);
-        requestId = savingsVaultIntents.request({
-            vault     : address(sparkVaultUSDC),
-            shares    : userSpUSDCShares/2,
-            recipient : user,
-            deadline  : block.timestamp + 200
-        });
+        requestId = _createRequest(
+            user,
+            sparkVaultUSDC,
+            userSpUSDCShares/2,
+            block.timestamp + 200
+        );
     
         assertEq(requestId, 2);
 
@@ -928,7 +947,7 @@ contract FulfillTests is TestBase {
 
     function test_fulfill_requestNotFound_wrongVault() external {
         // User created request for sparkVaultUSDC
-        uint256 requestId = _approveAndCreateRequest(
+        uint256 requestId = _createRequest(
             user,
             sparkVaultUSDC,
             userSpUSDCShares,
@@ -950,7 +969,7 @@ contract FulfillTests is TestBase {
 
     function test_fulfill_requestNotFoundRaceCondition() external {
         // User creates request A
-        uint256 requestA = _approveAndCreateRequest(
+        uint256 requestA = _createRequest(
             user,
             sparkVaultUSDC,
             userSpUSDCShares,
@@ -963,7 +982,7 @@ contract FulfillTests is TestBase {
         vm.prank(user);
         savingsVaultIntents.cancel(address(sparkVaultUSDC));
 
-        // User creates request B with half of his shares. No approval is needed again.
+        // User creates request B with half of his shares.
         uint256 requestB = _createRequest(
             user,
             sparkVaultUSDC,
@@ -994,7 +1013,7 @@ contract FulfillTests is TestBase {
     function test_fulfill_deadlineExceededBoundary() external {
         uint256 deadline = block.timestamp + 10;
 
-        uint256 requestId = _approveAndCreateRequest(
+        uint256 requestId = _createRequest(
             user,
             sparkVaultUSDC,
             userSpUSDCShares,
@@ -1024,8 +1043,8 @@ contract FulfillTests is TestBase {
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
     }
 
-    function test_fulfill_noSharesAllowance() external {
-        // Creating intent request without approval of shares
+    function test_fulfill_sharesAllowanceBoundary() external {
+        // User creates an intent request
         uint256 requestId = _createRequest(
             user,
             sparkVaultUSDC,
@@ -1035,20 +1054,24 @@ contract FulfillTests is TestBase {
 
         assertEq(requestId, 1);
 
-        assertEq(sparkVaultUSDC.allowance(user, address(savingsVaultIntents)), 0);
+        // User reducing the allowance by 1 before fulfill should cause fulfill to revert
 
-        // Fulfill the request will fail with insufficient allowances
+        vm.prank(user);
+        sparkVaultUSDC.approve(address(savingsVaultIntents), userSpUSDCShares - 1);
+
+        assertEq(sparkVaultUSDC.allowance(user, address(savingsVaultIntents)), userSpUSDCShares - 1);
+
         vm.expectRevert("SparkVault/insufficient-allowance");
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
 
-        // Approve the transfer.
+        // Fulfill succeeds when the allowance to savingsVaultIntents is exactly the required amount
+
         vm.prank(user);
         sparkVaultUSDC.approve(address(savingsVaultIntents), userSpUSDCShares);
 
         assertEq(sparkVaultUSDC.allowance(user, address(savingsVaultIntents)), userSpUSDCShares);
 
-        // Same request can be fulfilled after approval
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
 
@@ -1061,7 +1084,7 @@ contract FulfillTests is TestBase {
     function test_fulfill_insufficientUserFundsBoundary() external {
         assertEq(sparkVaultUSDC.balanceOf(user), userSpUSDCShares);
         
-        uint256 requestId = _approveAndCreateRequest(
+        uint256 requestId = _createRequest(
             user,
             sparkVaultUSDC,
             userSpUSDCShares,
@@ -1070,19 +1093,20 @@ contract FulfillTests is TestBase {
 
         assertEq(requestId, 1);
 
-        // User redeems all of his shares before fulfill
+        // Fulfill fails as user redeems 1 share from the requested userSpUSDCShares
+
         vm.prank(user);
-        sparkVaultUSDC.redeem(userSpUSDCShares, user, user);
+        uint256 redeemedAssets = sparkVaultUSDC.redeem(1, user, user);
 
-        assertEq(sparkVaultUSDC.balanceOf(user), 0);
+        assertEq(sparkVaultUSDC.balanceOf(user), userSpUSDCShares - 1);
 
-        // Request fulfill will fail
         vm.expectRevert("SparkVault/insufficient-balance");
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
 
-        // User deposits DEPOSIT_AMOUNT back to vault. So the existing request will be fulfilled.
-        _depositToVault(user, sparkVaultUSDC, DEPOSIT_AMOUNT_USDC);
+        // Fulfill succeeds when user deposits 1 share (redeemedAssets + 1) back to vault
+
+        _depositToVault(user, sparkVaultUSDC, redeemedAssets + 1); // Rounding
 
         assertEq(sparkVaultUSDC.balanceOf(user), userSpUSDCShares);
 
@@ -1093,12 +1117,14 @@ contract FulfillTests is TestBase {
     }
 
     function test_fulfill_insufficientVaultFundsBoundary() external {
-        _drainVaultBalance(sparkVaultUSDC);
+        // Drain all the sparkVaultUSDC liquidity
+
+        deal(sparkVaultUSDC.asset(), address(sparkVaultUSDC), 0);
 
         uint256 assetsAtBoundary    = sparkVaultUSDC.convertToAssets(userSpUSDCShares); // 999_999_999999
         uint256 assetsUnderBoundary = sparkVaultUSDC.convertToAssets(userSpUSDCShares) - 1; // 999_999_999998
 
-        uint256 requestId = _approveAndCreateRequest(
+        uint256 requestId = _createRequest(
             user,
             sparkVaultUSDC,
             userSpUSDCShares,
@@ -1110,7 +1136,7 @@ contract FulfillTests is TestBase {
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
 
-        _fundVaultBalance(sparkVaultUSDC, assetsUnderBoundary);
+        deal(sparkVaultUSDC.asset(), address(sparkVaultUSDC), assetsUnderBoundary);
         
         // Vault have one less than the assets required to redeem userShares, request fulfill fails
         vm.expectRevert("SparkVault/insufficient-liquidity");
@@ -1118,7 +1144,7 @@ contract FulfillTests is TestBase {
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
 
         // Vault have exact amount of assets required to redeem, request fulfilled
-        _fundVaultBalance(sparkVaultUSDC, assetsAtBoundary);
+        deal(sparkVaultUSDC.asset(), address(sparkVaultUSDC), assetsAtBoundary);
 
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
@@ -1131,12 +1157,10 @@ contract FulfillTests is TestBase {
     function test_fulfill() external {
         IERC20Like underlyingAsset = IERC20Like(sparkVaultUSDC.asset());
 
-        // Drain all vault balance and fund exact user deposited amount
+        // Deal exact user deposited amount
+        deal(sparkVaultUSDC.asset(), address(sparkVaultUSDC), DEPOSIT_AMOUNT_USDC);
 
-        _drainVaultBalance(sparkVaultUSDC);
-        _fundVaultBalance(sparkVaultUSDC, DEPOSIT_AMOUNT_USDC);
-
-        uint256 requestId = _approveAndCreateRequest(
+        uint256 requestId = _createRequest(
             user,
             sparkVaultUSDC,
             userSpUSDCShares,
@@ -1176,24 +1200,21 @@ contract FulfillTests is TestBase {
         IERC20Like underlyingAssetUSDC = IERC20Like(sparkVaultUSDC.asset());
         IERC20Like underlyingAssetETH  = IERC20Like(sparkVaultETH.asset());
 
-        // Drain both vaults balance and fund exact user deposited amount
+        // Deal exact user deposited amount to both vaults
 
-        _drainVaultBalance(sparkVaultUSDC);
-        _drainVaultBalance(sparkVaultETH);
-
-        _fundVaultBalance(sparkVaultUSDC, DEPOSIT_AMOUNT_USDC);
-        _fundVaultBalance(sparkVaultETH,  DEPOSIT_AMOUNT_ETH);
+        deal(sparkVaultUSDC.asset(), address(sparkVaultUSDC), DEPOSIT_AMOUNT_USDC);
+        deal(sparkVaultETH.asset(),  address(sparkVaultETH),  DEPOSIT_AMOUNT_ETH);
 
         // User creates sparkVaultUSDC and sparkVaultETH requests
 
-        uint256 requestIdVaultUSDC = _approveAndCreateRequest(
+        uint256 requestIdVaultUSDC = _createRequest(
             user,
             sparkVaultUSDC,
             userSpUSDCShares,
             block.timestamp + 100
         );
 
-        uint256 requestIdVaultETH = _approveAndCreateRequest(
+        uint256 requestIdVaultETH = _createRequest(
             user,
             sparkVaultETH,
             userSpETHShares,
@@ -1259,24 +1280,21 @@ contract FulfillTests is TestBase {
         IERC20Like underlyingAssetUSDC = IERC20Like(sparkVaultUSDC.asset());
         IERC20Like underlyingAssetETH  = IERC20Like(sparkVaultETH.asset());
 
-        // Drain both vaults balance and fund exact user deposited amount
+        // Deal exact user deposited amount to both vaults
 
-        _drainVaultBalance(sparkVaultUSDC);
-        _drainVaultBalance(sparkVaultETH);
-
-        _fundVaultBalance(sparkVaultUSDC, DEPOSIT_AMOUNT_USDC);
-        _fundVaultBalance(sparkVaultETH,  DEPOSIT_AMOUNT_ETH);
+        deal(sparkVaultUSDC.asset(), address(sparkVaultUSDC), DEPOSIT_AMOUNT_USDC);
+        deal(sparkVaultETH.asset(),  address(sparkVaultETH),  DEPOSIT_AMOUNT_ETH);
 
         // User creates sparkVaultUSDC and sparkVaultETH requests
 
-        uint256 requestIdVaultUSDC = _approveAndCreateRequest(
+        uint256 requestIdVaultUSDC = _createRequest(
             user,
             sparkVaultUSDC,
             userSpUSDCShares,
             block.timestamp + 100
         );
 
-        uint256 requestIdVaultETH = _approveAndCreateRequest(
+        uint256 requestIdVaultETH = _createRequest(
             user,
             sparkVaultETH,
             userSpETHShares,

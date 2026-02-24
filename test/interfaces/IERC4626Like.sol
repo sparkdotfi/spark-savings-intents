@@ -3,6 +3,8 @@ pragma solidity ^0.8.27;
 
 interface IERC4626Like {
 
+    function allowance(address owner, address spender) external view returns (uint256);
+    
     function approve(address spender, uint256 amount) external returns (bool);
 
     function asset() external view returns (address);
@@ -22,7 +24,5 @@ interface IERC4626Like {
     function transferFrom(address from, address to, uint256 amount) external returns (bool);
 
     function totalSupply() external view returns (uint256);
-
-    function allowance(address owner, address spender) external view returns (uint256);
 
 }

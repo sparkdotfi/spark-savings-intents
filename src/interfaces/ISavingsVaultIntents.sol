@@ -26,6 +26,7 @@ interface ISavingsVaultIntents {
 
     error DeadlineExceeded(address account, address vault, uint256 requestId, uint256 deadline);
     error InsufficientShares(uint256 sharesRequested, uint256 sharesPresent);
+    error InsufficientAllowance(uint256 requiredAllowance, uint256 currentAllowance);
     error IntentAssetsAboveMax(uint256 maxAssets, uint256 assets);
     error IntentAssetsBelowMin(uint256 minAssets, uint256 assets);
     error InvalidAdminAddress();

@@ -72,12 +72,9 @@ contract TestBase is Test {
             MAX_INTENT_ASSETS_ETH
         );
 
-        // User deposits assets into vaults
+        _userInitialSetup();
 
-        userSpUSDCShares = _depositToVault(user, sparkVaultUSDC, DEPOSIT_AMOUNT_USDC);
-        userSpETHShares  = _depositToVault(user, sparkVaultETH,  DEPOSIT_AMOUNT_ETH);
-
-        // Vaults totalSupply at _getBlock() + above user deposit
+        // Vaults totalSupply at _getBlock() + above user initial deposit
 
         sparkVaultUSDCInitSupply = sparkVaultUSDC.totalSupply();
         sparkVaultETHInitSupply  = sparkVaultETH.totalSupply();
@@ -87,15 +84,20 @@ contract TestBase is Test {
         return 24319071; //  January 26, 2026
     }
 
-    function _drainVaultBalance(IERC4626Like vault) internal virtual {
-        uint256 vaultBalance = IERC20Like(vault.asset()).balanceOf(address(vault));
+    function _userInitialSetup() internal {
+        // User deposits assets into vaults
 
-        vm.prank(Ethereum.ALM_PROXY);
-        IVaultLike(address(vault)).take(vaultBalance);
-    }
+        userSpUSDCShares = _depositToVault(user, sparkVaultUSDC, DEPOSIT_AMOUNT_USDC);
+        userSpETHShares  = _depositToVault(user, sparkVaultETH,  DEPOSIT_AMOUNT_ETH);
 
-    function _fundVaultBalance(IERC4626Like vault, uint256 amount_) internal {
-        deal(vault.asset(), address(vault), amount_);
+        // User approval to savingsVaultIntent
+
+        vm.startPrank(user);
+
+        sparkVaultUSDC.approve(address(savingsVaultIntents), userSpUSDCShares);
+        sparkVaultETH.approve(address(savingsVaultIntents),  userSpETHShares);
+
+        vm.stopPrank();
     }
 
     function _depositToVault(
@@ -117,23 +119,6 @@ contract TestBase is Test {
         shares = vault.deposit(assets, account);
     }
 
-    function _approveAndCreateRequest(
-        address      account,
-        IERC4626Like vault,
-        uint256      shares_,
-        uint256      deadline_
-    )
-        internal 
-        returns (uint256 requestId) 
-    {
-        // Approve the transfer.
-        vm.prank(account);
-        vault.approve(address(savingsVaultIntents), shares_);
-
-        // Create request
-        requestId = _createRequest(account, vault, shares_, deadline_);
-    }
-
     function _createRequest(
         address      account,
         IERC4626Like vault,
@@ -143,7 +128,6 @@ contract TestBase is Test {
         internal 
         returns (uint256 requestId) 
     {
-        // Create request
         vm.prank(account);
         requestId = savingsVaultIntents.request({
             vault     : address(vault),

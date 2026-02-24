@@ -102,8 +102,12 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
 
         require(shares <= userShares, InsufficientShares(shares, userShares));
 
+        uint256 allowance = IERC4626Like(vault).allowance(msg.sender, address(this));
+
+        require(allowance >= shares, InsufficientAllowance(shares, allowance));
+
         require(
-            deadline >= block.timestamp && deadline <= block.timestamp + maxDeadline,
+            deadline > block.timestamp && deadline <= block.timestamp + maxDeadline,
             InvalidDeadline(maxDeadline, deadline)
         );
 
