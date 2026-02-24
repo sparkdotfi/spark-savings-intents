@@ -1,0 +1,101 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+pragma solidity ^0.8.25;
+
+import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
+
+import { HandlerBase } from "./HandlerBase.sol";
+
+interface IERC4626Like {
+    function asset() external view returns (address);
+    function convertToAssets(uint256 shares) external view returns (uint256 assets);
+    function deposit(uint256 assets, address receiver) external returns (uint256 shares);
+}
+
+interface IERC20Like {
+    function approve(address spender, uint256 amount) external returns (bool);
+    function transferFrom(address from, address to, uint256 amount) external returns (bool);
+}
+
+contract UserHandler is HandlerBase {
+
+    uint256 public numUsers;
+
+    address[] public users;
+
+    mapping (address user => bool status)       public requestStatus;
+    mapping (address user => uint256 requestId) public requestIds;
+
+    constructor(address vault_, address savingsVaultIntents_, uint256 numUsers_) HandlerBase(vault_, savingsVaultIntents_) {
+        numUsers = numUsers_;
+        for (uint256 i = 0; i < numUsers_; i++) {
+            users.push(makeAddr(string(abi.encodePacked("user", i))));
+        }
+    }
+
+    function _getRandomUser(uint256 userIndex) internal view returns (address) {
+        return users[_bound(userIndex, 0, users.length - 1)];
+    }
+
+    function createRequest(uint256 assetAmount, uint32 userIndex, uint256 deadline) public {
+        deadline = _bound(deadline, block.timestamp, block.timestamp + savingsVaultIntents.maxDeadline());
+
+        address user = _getRandomUser(userIndex);
+
+        IERC20Like underlyingAsset = IERC20Like(IERC4626Like(vault).asset());
+
+        assetAmount = _bound(assetAmount, MIN_INTENT_ASSETS, MAX_INTENT_ASSETS);
+
+        deal(address(underlyingAsset), user, assetAmount);
+
+        vm.startPrank(user);
+        underlyingAsset.approve(address(vault), assetAmount);
+        uint256 shares = IERC4626Like(vault).deposit(assetAmount, address(user));
+        vm.stopPrank();
+
+        vm.prank(user);
+        uint256 requestId = savingsVaultIntents.request({
+            vault     : vault,
+            shares    : shares,
+            recipient : user,
+            deadline  : deadline
+        });
+
+        requestStatus[user] = true;
+        requestIds[user]    = requestId;
+    }
+
+    function cancelRequest(uint32 userIndex) public {
+        address user = _getRandomUser(userIndex);
+
+        if (requestStatus[user]) {
+            requestStatus[user] = false;
+
+            delete requestIds[user];
+
+            vm.prank(user);
+            savingsVaultIntents.cancel();
+        }
+    }
+
+    function fulfillRequest(uint32 userIndex) public {
+        address user = _getRandomUser(userIndex);
+
+        if (requestStatus[user]) {
+            requestStatus[user] = false;
+
+            delete requestIds[user];
+
+            ( uint256 requestId, address vault_, uint256 shares,, ) = savingsVaultIntents.withdrawRequests(user);
+
+            uint256 userAmount = IERC4626Like(vault_).convertToAssets(shares);
+
+            address underlyingAsset = IERC4626Like(vault_).asset();
+
+            deal(underlyingAsset, vault_, userAmount);
+
+            vm.prank(relayer);
+            savingsVaultIntents.fulfill(user, requestId);
+        }
+    }
+
+}
