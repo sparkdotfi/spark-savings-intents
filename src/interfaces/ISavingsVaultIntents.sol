@@ -15,7 +15,6 @@ interface ISavingsVaultIntents {
 
     struct WithdrawRequest {
         uint256 requestId;
-        address vault;
         uint256 shares;
         address recipient;
         uint256 deadline;
@@ -25,8 +24,9 @@ interface ISavingsVaultIntents {
     /*** Errors                                                                                 ***/
     /**********************************************************************************************/
 
-    error DeadlineExceeded(address account, uint256 requestId, uint256 deadline);
+    error DeadlineExceeded(address account, address vault, uint256 requestId, uint256 deadline);
     error InsufficientShares(uint256 sharesRequested, uint256 sharesPresent);
+    error InsufficientAllowance(uint256 requiredAllowance, uint256 currentAllowance);
     error IntentAssetsAboveMax(uint256 maxAssets, uint256 assets);
     error IntentAssetsBelowMin(uint256 minAssets, uint256 assets);
     error InvalidAdminAddress();
@@ -36,7 +36,7 @@ interface ISavingsVaultIntents {
     error InvalidRelayerAddress();
     error InvalidVaultAddress();
     error InvalidIntentAmountBounds(uint256 minIntentAssets, uint256 maxIntentAssets);
-    error RequestNotFound(address account);
+    error RequestNotFound(address account, address vault);
     error VaultNotWhitelisted();
 
     /**********************************************************************************************/
@@ -44,18 +44,27 @@ interface ISavingsVaultIntents {
     /**********************************************************************************************/
 
     event MaxDeadlineUpdated(uint256 indexed maxDeadline);
-    event RequestCancelled(address indexed account, uint256 indexed requestId);
+
+    event RequestCancelled(
+        address indexed account,
+        address indexed vault,
+        uint256 indexed requestId
+    );
 
     event RequestCreated(
         address indexed account,
-        uint256 indexed requestId,
         address indexed vault,
+        uint256 indexed requestId,
         uint256         shares,
         address         recipient,
         uint256         deadline
     );
 
-    event RequestFulfilled(address indexed account, uint256 indexed requestId);
+    event RequestFulfilled(
+        address indexed account,
+        address indexed vault,
+        uint256 indexed requestId
+    );
 
     event VaultConfigUpdated(
         address indexed vault,
@@ -81,9 +90,11 @@ interface ISavingsVaultIntents {
     /*** External functions                                                                     ***/
     /**********************************************************************************************/
 
-    function cancel() external;
+    function cancel(address vault) external returns (uint256 requestId);
 
-    function fulfill(address account, uint256 requestId) external;
+    function fulfill(address account, address vault, uint256 requestId) external;
+
+    function maxDeadline() external view returns (uint256 maxDeadline);
 
     function request(
         address vault,
@@ -91,5 +102,28 @@ interface ISavingsVaultIntents {
         address recipient,
         uint256 deadline
     ) external returns (uint256 requestId);
+
+    function RELAYER() external view returns (bytes32 relayer);
+
+    function vaultConfig(address vault)
+        external
+        view
+        returns (
+            bool    whitelisted,
+            uint256 minIntentAssets,
+            uint256 maxIntentAssets
+        );
+
+    function vaultRequestCount(address vault) external view returns (uint256 requestCount);
+
+    function withdrawRequests(address account, address vault)
+        external
+        view
+        returns (
+            uint256 requestId,
+            uint256 shares,
+            address recipient,
+            uint256 deadline
+        );
 
 }
