@@ -157,9 +157,7 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
 
         emit RequestFulfilled(account, vault, request_.requestId);
 
-        IERC4626Like(vault).transferFrom(account, address(this), request_.shares);
-
-        IERC4626Like(vault).redeem(request_.shares, request_.recipient, address(this));
+        IERC4626Like(vault).redeem(request_.shares, request_.recipient, account);
     }
 
 }

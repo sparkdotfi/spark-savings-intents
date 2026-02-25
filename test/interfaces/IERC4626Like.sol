@@ -21,8 +21,6 @@ interface IERC4626Like {
         external
         returns (uint256 assets);
 
-    function transferFrom(address from, address to, uint256 amount) external returns (bool);
-
     function totalSupply() external view returns (uint256);
 
 }
