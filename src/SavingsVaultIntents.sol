@@ -15,20 +15,17 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     bytes32 public constant RELAYER = keccak256("RELAYER");
 
     uint256 public maxDeadline;
-    uint256 public requestCount;
 
-    mapping(address => VaultConfig)     public vaultConfig;
-    mapping(address => WithdrawRequest) public withdrawRequests;
+    mapping(address vault => VaultConfig config)   public vaultConfig;
+    mapping(address vault => uint256 requestCount) public vaultRequestCount;
 
-    constructor(
-        address admin,
-        address relayer,
-        uint256 maxDeadline_
-    ) {
+    mapping(address account => mapping(address vault => WithdrawRequest request)) public withdrawRequests;
+
+    constructor(address admin, address relayer, uint256 maxDeadline_) {
         require(admin   != address(0), InvalidAdminAddress());
         require(relayer != address(0), InvalidRelayerAddress());
 
-        require(maxDeadline_     > 0, InvalidMaxDeadline());
+        require(maxDeadline_ != 0, InvalidMaxDeadline());
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(RELAYER,            relayer);
@@ -41,7 +38,7 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     /**********************************************************************************************/
 
     function setMaxDeadline(uint256 maxDeadline_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(maxDeadline_ > 0, InvalidMaxDeadline());
+        require(maxDeadline_ != 0, InvalidMaxDeadline());
 
         maxDeadline = maxDeadline_;
 
@@ -86,8 +83,8 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     {
         VaultConfig memory vaultConfig_ = vaultConfig[vault];
 
-        require(vaultConfig_.whitelisted,  VaultNotWhitelisted());
-        require(recipient != address(0),   InvalidRecipientAddress());
+        require(vaultConfig_.whitelisted, VaultNotWhitelisted());
+        require(recipient != address(0),  InvalidRecipientAddress());
 
         uint256 assets = IERC4626Like(vault).convertToAssets(shares);
 
@@ -101,55 +98,68 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
             IntentAssetsAboveMax(vaultConfig_.maxIntentAssets, assets)
         );
 
-        uint256 userShares = IERC4626Like(vault).balanceOf(msg.sender);
-
-        require(shares <= userShares, InsufficientShares(shares, userShares));
-
         require(
             deadline > block.timestamp && deadline <= block.timestamp + maxDeadline,
             InvalidDeadline(maxDeadline, deadline)
         );
 
-        requestId = ++requestCount;
+        uint256 userShares = IERC4626Like(vault).balanceOf(msg.sender);
 
-        withdrawRequests[msg.sender] = WithdrawRequest({
+        require(shares <= userShares, InsufficientShares(shares, userShares));
+
+        uint256 allowance = IERC4626Like(vault).allowance(msg.sender, address(this));
+
+        require(shares <= allowance, InsufficientAllowance(shares, allowance));
+
+        requestId = ++vaultRequestCount[vault];
+
+        withdrawRequests[msg.sender][vault] = WithdrawRequest({
             requestId : requestId,
-            vault     : vault,
             shares    : shares,
             recipient : recipient,
             deadline  : deadline
         });
 
-        emit RequestCreated(msg.sender, requestId, vault, shares, recipient, deadline);
+        emit RequestCreated(msg.sender, vault, requestId, shares, recipient, deadline);
     }
 
-    function cancel() external {
-        WithdrawRequest memory request_ = withdrawRequests[msg.sender];
+    function cancel(address vault) external returns (uint256 requestId) {
+        requestId = withdrawRequests[msg.sender][vault].requestId;
 
-        require(request_.requestId != 0, RequestNotFound(msg.sender));
+        require(requestId != 0, RequestNotFound(msg.sender, vault));
 
-        delete withdrawRequests[msg.sender];
+        delete withdrawRequests[msg.sender][vault];
 
-        emit RequestCancelled(msg.sender, request_.requestId);
+        emit RequestCancelled(msg.sender, vault, requestId);
     }
 
-    function fulfill(address account, uint256 requestId_) external onlyRole(RELAYER) {
-        WithdrawRequest memory request_ = withdrawRequests[account];
+    function fulfill(
+        address account,
+        address vault,
+        uint256 requestId
+    )
+        external
+        onlyRole(RELAYER)
+    {
+        WithdrawRequest memory request_ = withdrawRequests[account][vault];
 
-        require(requestId_ != 0 && request_.requestId == requestId_, RequestNotFound(account));
+        require(
+            requestId != 0 && request_.requestId == requestId,
+            RequestNotFound(account, vault)
+        );
 
         require(
             block.timestamp <= request_.deadline,
-            DeadlineExceeded(account, request_.requestId, request_.deadline)
+            DeadlineExceeded(account, vault, request_.requestId, request_.deadline)
         );
 
-        delete withdrawRequests[account];
+        delete withdrawRequests[account][vault];
 
-        emit RequestFulfilled(account, request_.requestId);
+        emit RequestFulfilled(account, vault, request_.requestId);
 
-        IERC4626Like(request_.vault).transferFrom(account, address(this), request_.shares);
+        IERC4626Like(vault).transferFrom(account, address(this), request_.shares);
 
-        IERC4626Like(request_.vault).redeem(request_.shares, request_.recipient, address(this));
+        IERC4626Like(vault).redeem(request_.shares, request_.recipient, address(this));
     }
 
 }
