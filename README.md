@@ -33,7 +33,7 @@ The system involves three actors:
 
 > **Note:** The diagram below is from an earlier design iteration and will be replaced. The current implementation uses a simple ERC-20 `approve` instead of permit signatures.
 
-[Savings Intent Architecture](docs/saving_intents_architecture.png)
+![Savings Intent Architecture](docs/saving_intents_architecture.png)
 
 **Step-by-step flow (current implementation):**
 
