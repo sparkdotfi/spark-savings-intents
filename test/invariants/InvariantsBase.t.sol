@@ -27,6 +27,8 @@ contract InvariantsBase is Test {
     address relayer = makeAddr("relayer");
 
     function setUp() public virtual {
+        vm.createSelectFork(getChain("mainnet").rpcUrl);
+
         vault           = IERC4626Like(Ethereum.SPARK_VAULT_V2_SPUSDC);
         underlyingAsset = IERC20Like(vault.asset());
 

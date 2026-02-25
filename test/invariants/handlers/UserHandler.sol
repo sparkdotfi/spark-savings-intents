@@ -5,7 +5,10 @@ import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
 
 import { HandlerBase } from "./HandlerBase.sol";
 
+import { console2 } from "forge-std/console2.sol";
+
 interface IERC4626Like {
+    function approve(address spender, uint256 amount) external returns (bool);
     function asset() external view returns (address);
     function convertToAssets(uint256 shares) external view returns (uint256 assets);
     function deposit(uint256 assets, address receiver) external returns (uint256 shares);
@@ -37,7 +40,13 @@ contract UserHandler is HandlerBase {
     }
 
     function createRequest(uint256 assetAmount, uint32 userIndex, uint256 deadline) public {
-        deadline = _bound(deadline, block.timestamp, block.timestamp + savingsVaultIntents.maxDeadline());
+        deadline = _bound(deadline, block.timestamp, block.timestamp + savingsVaultIntents.maxDeadline() - 1);
+
+        ( bool whitelisted,, ) = savingsVaultIntents.vaultConfig(vault);
+
+        if ( !whitelisted ) {
+            return;
+        }
 
         address user = _getRandomUser(userIndex);
 
@@ -51,6 +60,14 @@ contract UserHandler is HandlerBase {
         underlyingAsset.approve(address(vault), assetAmount);
         uint256 shares = IERC4626Like(vault).deposit(assetAmount, address(user));
         vm.stopPrank();
+
+        // Approve savingsVaultIntents to spend shares
+        vm.prank(user);
+        IERC4626Like(vault).approve(address(savingsVaultIntents), shares);
+
+        console2.log("deadline", deadline);
+        console2.log("block.timestamp", block.timestamp);
+        console2.log("maxDeadline", savingsVaultIntents.maxDeadline());
 
         vm.prank(user);
         uint256 requestId = savingsVaultIntents.request({
@@ -73,7 +90,7 @@ contract UserHandler is HandlerBase {
             delete requestIds[user];
 
             vm.prank(user);
-            savingsVaultIntents.cancel();
+            savingsVaultIntents.cancel(address(vault));
         }
     }
 
@@ -85,16 +102,16 @@ contract UserHandler is HandlerBase {
 
             delete requestIds[user];
 
-            ( uint256 requestId, address vault_, uint256 shares,, ) = savingsVaultIntents.withdrawRequests(user);
+            ( uint256 requestId, uint256 shares,, ) = savingsVaultIntents.withdrawRequests(user, address(vault));
 
-            uint256 userAmount = IERC4626Like(vault_).convertToAssets(shares);
+            uint256 userAmount = IERC4626Like(vault).convertToAssets(shares);
 
-            address underlyingAsset = IERC4626Like(vault_).asset();
+            address underlyingAsset = IERC4626Like(vault).asset();
 
-            deal(underlyingAsset, vault_, userAmount);
+            deal(underlyingAsset, address(vault), userAmount);
 
             vm.prank(relayer);
-            savingsVaultIntents.fulfill(user, requestId);
+            savingsVaultIntents.fulfill(user, address(vault), requestId);
         }
     }
 

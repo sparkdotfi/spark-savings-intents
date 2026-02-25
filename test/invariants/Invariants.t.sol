@@ -19,4 +19,20 @@ contract Invariants is InvariantsBase {
         targetContract(address(userHandler));
     }
 
+    function invariant_savingsVaultIntentsInvariants() public view {
+        this.savingsVaultIntentsInvariant_savingsVaultIntentsBalanceIsZero();
+    }
+
+    /**********************************************************************************************/
+    /*** SavingsVaultIntents invariant helper functions                                         ***/
+    /**********************************************************************************************/
+
+    function savingsVaultIntentsInvariant_savingsVaultIntentsBalanceIsZero() public view {
+        assertEq(
+            vault.balanceOf(address(savingsVaultIntents)),
+            0,
+            string(abi.encodePacked("savingsVaultIntents balance is not zero"))
+        );
+    }
+
 }
