@@ -2,8 +2,8 @@
 pragma solidity ^0.8.27;
 
 /**
- *  @title  ISavingsVaultIntents
- *  @dev    Interface for managing intent-based withdrawal requests from spark savings vaults v2.
+ *  @title ISavingsVaultIntents
+ *  @dev   Interface for managing intent-based withdrawal requests from spark savings vaults v2.
  *          Users submit withdrawal requests that a relayer fulfills offchain.
  */
 interface ISavingsVaultIntents {
@@ -13,10 +13,10 @@ interface ISavingsVaultIntents {
     /**********************************************************************************************/
 
     /**
-     *  @dev    Configuration for a specific vault.
-     *  @param  whitelisted     Whether the vault is allowed to be used with this contract.
-     *  @param  minIntentAssets Minimum asset value (in underlying) required per withdrawal request.
-     *  @param  maxIntentAssets Maximum asset value (in underlying) allowed per withdrawal request.
+     *  @dev   Configuration for a specific vault.
+     *  @param whitelisted     Whether the vault is allowed to be used with this contract.
+     *  @param minIntentAssets Minimum asset value (in underlying) required per withdrawal request.
+     *  @param maxIntentAssets Maximum asset value (in underlying) allowed per withdrawal request.
      */
     struct VaultConfig {
         bool    whitelisted;
@@ -25,11 +25,11 @@ interface ISavingsVaultIntents {
     }
 
     /**
-     *  @dev    Data for a pending withdrawal request.
-     *  @param  requestId Auto-incrementing identifier scoped to the vault.
-     *  @param  shares    Number of vault shares the user wants to withdraw.
-     *  @param  recipient Address that will receive the redeemed assets.
-     *  @param  deadline  Timestamp after which the request can no longer be fulfilled.
+     *  @dev   Data for a pending withdrawal request.
+     *  @param requestId Auto-incrementing identifier scoped to the vault.
+     *  @param shares    Number of vault shares the user wants to withdraw.
+     *  @param recipient Address that will receive the redeemed assets.
+     *  @param deadline  Timestamp after which the request can no longer be fulfilled.
      */
     struct WithdrawRequest {
         uint256 requestId;
@@ -42,74 +42,46 @@ interface ISavingsVaultIntents {
     /*** Errors                                                                                 ***/
     /**********************************************************************************************/
 
-    /**
-     *  @dev   Thrown when trying to fulfill a request after its deadline has passed.
-     */
+    /// @dev Thrown when trying to fulfill a request after its deadline has passed.
     error DeadlineExceeded(address account, address vault, uint256 requestId, uint256 deadline);
 
-    /**
-     *  @dev   Thrown when the caller does not hold enough vault shares to cover the request.
-     */
+    /// @dev Thrown when the caller does not hold enough vault shares to cover the request.
     error InsufficientShares(uint256 sharesRequested, uint256 sharesPresent);
 
-    /**
-     *  @dev   Thrown when the contract does not have enough share allowance from the caller.
-     */
+    /// @dev Thrown when the contract does not have enough share allowance from the caller.
     error InsufficientAllowance(uint256 requiredAllowance, uint256 currentAllowance);
 
-    /**
-     *  @dev   Thrown when the request's asset value exceeds the vault's configured maximum.
-     */
+    /// @dev Thrown when the request's asset value exceeds the vault's configured maximum.
     error IntentAssetsAboveMax(uint256 maxAssets, uint256 assets);
 
-    /**
-     *  @dev   Thrown when the request's asset value is below the vault's configured minimum.
-     */
+    /// @dev Thrown when the request's asset value is below the vault's configured minimum.
     error IntentAssetsBelowMin(uint256 minAssets, uint256 assets);
 
-    /**
-     *  @dev   Thrown when the admin address is the zero address.
-     */
+    /// @dev Thrown when the admin address is the zero address.
     error InvalidAdminAddress();
 
-    /**
-     *  @dev   Thrown when the requested deadline exceeds the allowed maximum deadline.
-     */
+    /// @dev Thrown when the requested deadline exceeds the allowed maximum deadline.
     error InvalidDeadline(uint256 maxDeadline, uint256 deadline);
 
-    /**
-     *  @dev   Thrown when the max deadline is set to zero.
-     */
+    /// @dev Thrown when the max deadline is set to zero.
     error InvalidMaxDeadline();
 
-    /**
-     *  @dev   Thrown when the recipient address is the zero address.
-     */
+    /// @dev Thrown when the recipient address is the zero address.
     error InvalidRecipientAddress();
 
-    /**
-     *  @dev   Thrown when the relayer address is the zero address.
-     */
+    /// @dev Thrown when the relayer address is the zero address.
     error InvalidRelayerAddress();
 
-    /**
-     *  @dev   Thrown when the vault address is the zero address.
-     */
+    /// @dev Thrown when the vault address is the zero address.
     error InvalidVaultAddress();
 
-    /**
-     *  @dev   Thrown when min intent assets is not less than max intent assets.
-     */
+    /// @dev Thrown when min intent assets is not less than max intent assets.
     error InvalidIntentAmountBounds(uint256 minIntentAssets, uint256 maxIntentAssets);
 
-    /**
-     *  @dev   Thrown when no pending request exists for the given account and vault.
-     */
+    /// @dev Thrown when no pending request exists for the given account and vault.
     error RequestNotFound(address account, address vault);
 
-    /**
-     *  @dev   Thrown when the vault is not whitelisted.
-     */
+    /// @dev Thrown when the vault is not whitelisted.
     error VaultNotWhitelisted();
 
     /**********************************************************************************************/
@@ -183,19 +155,19 @@ interface ISavingsVaultIntents {
     /**********************************************************************************************/
 
     /**
-     *  @dev    Sets the maximum allowed deadline for withdrawal requests.
-     *          This function can only called by accounts with DEFAULT_ADMIN_ROLE.
-     *  @param  maxDeadline_ New maximum deadline value in seconds.
+     *  @dev   Sets the maximum allowed deadline for withdrawal requests.
+     *         This function can only called by accounts with DEFAULT_ADMIN_ROLE.
+     *  @param maxDeadline_ New maximum deadline value in seconds.
      */
     function setMaxDeadline(uint256 maxDeadline_) external;
 
     /**
-     *  @dev    Updates the configuration for a given vault.
-     *          This function can only called by accounts with DEFAULT_ADMIN_ROLE.
-     *  @param  vault            Address of the vault to configure.
-     *  @param  whitelisted_     Whether the vault should be whitelisted.
-     *  @param  minIntentAssets_ Minimum asset value required per request.
-     *  @param  maxIntentAssets_ Maximum asset value allowed per request.
+     *  @dev   Updates the configuration for a given vault.
+     *         This function can only called by accounts with DEFAULT_ADMIN_ROLE.
+     *  @param vault            Address of the vault to configure.
+     *  @param whitelisted_     Whether the vault should be whitelisted.
+     *  @param minIntentAssets_ Minimum asset value required per request.
+     *  @param maxIntentAssets_ Maximum asset value allowed per request.
      */
     function updateVaultConfig(
         address vault,
@@ -216,11 +188,11 @@ interface ISavingsVaultIntents {
     function cancel(address vault) external returns (uint256 requestId);
 
     /**
-     *  @dev    Fulfills a pending withdrawal request by redeeming shares from the vault.
-     *          This function can only called by accounts with RELAYER role.
-     *  @param  account   Address of the user whose request is being fulfilled.
-     *  @param  vault     Address of the vault to redeem from.
-     *  @param  requestId Expected request identifier, used to prevent stale fulfillments.
+     *  @dev   Fulfills a pending withdrawal request by redeeming shares from the vault.
+     *         This function can only called by accounts with RELAYER role.
+     *  @param account   Address of the user whose request is being fulfilled.
+     *  @param vault     Address of the vault to redeem from.
+     *  @param requestId Expected request identifier, used to prevent stale fulfillments.
      */
     function fulfill(address account, address vault, uint256 requestId) external;
 
@@ -231,12 +203,12 @@ interface ISavingsVaultIntents {
     function maxDeadline() external view returns (uint256 maxDeadline);
 
     /**
-     *  @dev    Creates a new withdrawal request for a given vault.
-     *          The caller must have approved this contract to transfer their vault shares.
-     *  @param  vault     Address of the vault to withdraw from.
-     *  @param  shares    Number of vault shares to withdraw.
-     *  @param  recipient Address that will receive the redeemed assets.
-     *  @param  deadline  Timestamp after which the request expires. Must be strictly greater than 
+     *  @dev   Creates a new withdrawal request for a given vault.
+     *         The caller must have approved this contract to transfer their vault shares.
+     *  @param vault     Address of the vault to withdraw from.
+     *  @param shares    Number of vault shares to withdraw.
+     *  @param recipient Address that will receive the redeemed assets.
+     *  @param deadline  Timestamp after which the request expires. Must be strictly greater than 
      *                    the current block timestamp and must not exceed block.timestamp + maxDeadline.
      *  @return requestId Identifier assigned to the new request.
      */
