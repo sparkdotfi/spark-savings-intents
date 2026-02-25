@@ -13,7 +13,7 @@ Spark Liquidity Intents is a system designed to handle large liquidity operation
 
 ### Problem
 
-Spark Savings Vaults are ERC-4626 vaults where users deposit assets and receive vault shares. When users want to withdraw -especially large amounts -the vault may not hold enough idle liquidity to process the redemption immediately. A direct on-chain `redeem` call would simply revert, leaving the user unable to exit their position.
+Spark Savings Vaults are ERC-4626 vaults where users deposit assets and receive vault shares. When users want to withdraw especially large amounts the vault may not hold enough idle liquidity to process the redemption immediately. A direct on-chain `redeem` call would simply revert, leaving the user unable to exit their position.
 
 ### Solution
 
@@ -31,19 +31,17 @@ The system involves three actors:
 
 ### User Flow
 
-> **Note:** The diagram below is from an earlier design iteration and will be replaced. The current implementation uses a simple ERC-20 `approve` instead of permit signatures.
-
 ![Savings Intent Architecture](docs/saving_intents_architecture.png)
 
 **Step-by-step flow (current implementation):**
 
-1. **Approve shares** -User approves the SavingsVaultIntents contract to spend their vault shares via `vault.approve(intentContract, shares)`.
-2. **Create request** -User calls `request(vault, shares, recipient, deadline)` on the intent contract. The contract validates all preconditions and stores the `WithdrawRequest`.
-3. **Event emitted** -A `RequestCreated` event is emitted containing the account, vault, requestId, shares, recipient, and deadline.
-4. **Liquidity orchestration** -The ALM Planner monitors `RequestCreated` events. It orchestrates the required liquidity by instructing asset liquidation and transferring the proceeds into the Spark Vault so it has enough idle assets to cover the redemption.
-5. **Fulfill request** -The ALM Planner calls `fulfill(account, vault, requestId)` on the intent contract.
-6. **Atomic redemption** -The contract deletes the stored request and calls `vault.redeem(shares, recipient, account)`, redeeming on behalf of the user using their share allowance and sending the underlying assets directly to the recipient. The intent contract never holds any shares or assets.
-7. **User receives assets** -The user (or specified recipient) receives the underlying assets in their wallet.
+1. **Approve shares**:  User approves the SavingsVaultIntents contract to spend their vault shares via `vault.approve(intentContract, shares)`.
+2. **Create request**: User calls `request(vault, shares, recipient, deadline)` on the intent contract. The contract validates all preconditions and stores the `WithdrawRequest`.
+3. **Event emitted**: A `RequestCreated` event is emitted containing the account, vault, requestId, shares, recipient, and deadline.
+4. **Liquidity orchestration**: The ALM Planner monitors `RequestCreated` events. It orchestrates the required liquidity by instructing asset liquidation and transferring the proceeds into the Spark Vault so it has enough idle assets to cover the redemption.
+5. **Fulfill request**: The ALM Planner calls `fulfill(account, vault, requestId)` on the intent contract.
+6. **Atomic redemption**: The contract deletes the stored request and calls `vault.redeem(shares, recipient, account)`, redeeming on behalf of the user using their share allowance and sending the underlying assets directly to the recipient. The intent contract never holds any shares or assets.
+7. **User receives assets**: The user (or specified recipient) receives the underlying assets in their wallet.
 
 ## Functionality
 
@@ -70,10 +68,10 @@ A user can cancel their pending request by calling `cancel(vault)`. This deletes
 The `fulfill(account, vault, requestId)` function is restricted to accounts with the `RELAYER` role (the Spark ALM Planner). When called, it:
 
 1. Loads the stored `WithdrawRequest` for the given account and vault
-2. Validates that the request exists and the provided `requestId` matches the stored one (race condition protection -see [Security](#security-considerations))
+2. Validates that the request exists and the provided `requestId` matches the stored one (race condition protection - see [Security](#security-considerations))
 3. Validates that the deadline has not been exceeded
 4. Deletes the stored request
-5. Calls `vault.redeem(shares, recipient, account)` -redeeming the user's shares on their behalf (using the share allowance) and sending the underlying assets directly to the specified recipient
+5. Calls `vault.redeem(shares, recipient, account)`, redeeming the user's shares on their behalf (using the share allowance) and sending the underlying assets directly to the specified recipient
 
 The fulfillment is **atomic**: the intent contract never holds any shares or assets at any point during execution.
 
@@ -99,16 +97,16 @@ The contract uses OpenZeppelin's `AccessControlEnumerable` with two roles:
 
 The admin can perform the following configuration operations:
 
-- **`setMaxDeadline(uint256 maxDeadline_)`** -Updates the maximum allowed deadline duration. The deadline for any request must be at most `block.timestamp + maxDeadline` into the future. Cannot be set to zero.
+- **`setMaxDeadline(uint256 maxDeadline_)`** - Updates the maximum allowed deadline duration. The deadline for any request must be at most `block.timestamp + maxDeadline` into the future. Cannot be set to zero.
 
-- **`updateVaultConfig(address vault, bool whitelisted, uint256 minIntentAssets, uint256 maxIntentAssets)`** -Configures a vault's whitelist status and intent amount bounds. The `minIntentAssets` must be strictly less than `maxIntentAssets`. These bounds define the acceptable range for the underlying asset value of requested shares.
+- **`updateVaultConfig(address vault, bool whitelisted, uint256 minIntentAssets, uint256 maxIntentAssets)`** - Configures a vault's whitelist status and intent amount bounds. The `minIntentAssets` must be strictly less than `maxIntentAssets`. These bounds define the acceptable range for the underlying asset value of requested shares.
   - The min/max intent asset bounds exist because the intent system is designed to serve **large withdrawals** from Spark Savings Vaults. In production, these thresholds will be set to high values (e.g., millions of USDC) to ensure the system is used for its intended purpose.
 
 ### RELAYER
 
 The relayer (Spark ALM Planner) has a single capability:
 
-- **`fulfill(address account, address vault, uint256 requestId)`** -Execute the atomic withdrawal fulfillment for a user's pending request.
+- **`fulfill(address account, address vault, uint256 requestId)`** - Execute the atomic withdrawal fulfillment for a user's pending request.
 
 ## Security Considerations
 
@@ -121,8 +119,8 @@ This section is intended for auditors and security researchers reviewing the `Sa
 
 ### Key Invariants
 
-- **Atomic fulfillment** -The intent contract never holds any shares or assets at any point. Fulfillment calls `vault.redeem(shares, recipient, account)` directly, redeeming on behalf of the user and sending assets straight to the recipient.
-- **Vault compatibility** -Whitelisted vaults will be Spark Vault v2. The intent contract is designed to be fully compatible with the Spark Vault v2 implementation.
+- **Atomic fulfillment:** The intent contract never holds any shares or assets at any point. Fulfillment calls `vault.redeem(shares, recipient, account)` directly, redeeming on behalf of the user and sending assets straight to the recipient.
+- **Vault compatibility:** Whitelisted vaults will be Spark Vault v2. The intent contract is designed to be fully compatible with the Spark Vault v2 implementation.
 
 ### Expected Behaviors
 
@@ -133,11 +131,11 @@ This section is intended for auditors and security researchers reviewing the `Sa
 
 #### 1. Post-Request Allowance/Balance Revocation
 
-A user can revoke their share allowance or transfer shares away after successfully creating a request. This would make the request unfulfillable -the `redeem` call during `fulfill` would revert due to insufficient allowance or balance.
+A user can revoke their share allowance or transfer shares away after successfully creating a request. This would make the request unfulfillable, the `redeem` call during `fulfill` would revert due to insufficient allowance or balance.
 
 **Mitigation:** The ALM Planner is functionally intelligent and will detect such invalid requests off-chain, avoiding wasted gas on doomed `fulfill` calls. Even if the planner did attempt fulfillment, the transaction would simply revert with no adverse effects.
 
-The high `minIntentAssets` threshold makes spamming (creating requests then revoking) economically impractical -the user would need to hold a significant amount of vault shares. There is no upside for attackers performing this kind of spam.
+The high `minIntentAssets` threshold makes spamming (creating requests then revoking) economically impractical, the user would need to hold a significant amount of vault shares. There is no upside for attackers performing this kind of spam.
 
 #### 2. Stale Min/Max Asset Checks
 
