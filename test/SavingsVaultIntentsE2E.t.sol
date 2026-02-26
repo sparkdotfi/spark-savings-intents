@@ -23,10 +23,6 @@ contract E2ETests is TestBase {
         // Deal exact user deposited amount
         deal(sparkVaultUSDC.asset(), address(sparkVaultUSDC), DEPOSIT_AMOUNT_USDC);
 
-        // Approve the transfer.
-        vm.prank(user);
-        sparkVaultUSDC.approve(address(savingsVaultIntents), userSpUSDCShares);
-
         // Step 1: User creates request
         _assertEmptyRequest(user, sparkVaultUSDC);
 
@@ -95,9 +91,6 @@ contract E2ETests is TestBase {
         deal(sparkVaultUSDC.asset(), address(sparkVaultUSDC), DEPOSIT_AMOUNT_USDC);
 
         // - Step 1: User creates request for 1/3 shares.
-        vm.prank(user);
-        sparkVaultUSDC.approve(address(savingsVaultIntents), userSpUSDCShares / 3);
-
         vm.prank(user);
         uint256 requestId = savingsVaultIntents.request({
             vault     : address(sparkVaultUSDC),
@@ -182,10 +175,6 @@ contract E2ETests is TestBase {
 
         assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
 
-        // Approve the transfer.
-        vm.prank(user);
-        sparkVaultUSDC.approve(address(savingsVaultIntents), userSpUSDCShares);
-
         vm.expectEmit(address(savingsVaultIntents));
         emit ISavingsVaultIntents.RequestCreated({
             account   : user,
@@ -218,7 +207,6 @@ contract E2ETests is TestBase {
         });
 
         // Step 2: Warp 99s
-
         vm.warp(block.timestamp + 99);
 
         deal(sparkVaultUSDC.asset(), address(sparkVaultUSDC), DEPOSIT_AMOUNT_USDC + 1_000e6);  // Deal interest earned by the vault.
@@ -256,10 +244,6 @@ contract E2ETests is TestBase {
 
         assertEq(savingsVaultIntents.vaultRequestCount(address(sparkVaultUSDC)), 0);
 
-        // Approve the transfer.
-        vm.prank(user);
-        sparkVaultUSDC.approve(address(savingsVaultIntents), userSpUSDCShares);
-
         uint256 deadline = block.timestamp + 100;
 
         vm.expectEmit(address(savingsVaultIntents));
@@ -294,10 +278,18 @@ contract E2ETests is TestBase {
         });
 
         // Step 2: Warp 101 seconds forward
-        vm.warp(block.timestamp + 101);
+        vm.warp(deadline + 1);
 
         // Step 3: Relayer tries to fulfill the request but it reverts because the deadline has passed.
-        vm.expectRevert(abi.encodeWithSelector(ISavingsVaultIntents.DeadlineExceeded.selector, user, address(sparkVaultUSDC), requestId, deadline));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                ISavingsVaultIntents.DeadlineExceeded.selector,
+                user,
+                address(sparkVaultUSDC),
+                requestId,
+                deadline
+            )
+        );
         vm.prank(relayer);
         savingsVaultIntents.fulfill(user, address(sparkVaultUSDC), requestId);
 
@@ -359,7 +351,12 @@ contract E2ETests is TestBase {
         savingsVaultIntents.setMaxDeadline(block.timestamp + 50);
 
         vm.prank(admin);
-        savingsVaultIntents.updateVaultConfig(address(sparkVaultUSDC), true, MIN_INTENT_ASSETS_USDC - 1, MAX_INTENT_ASSETS_USDC + 1);
+        savingsVaultIntents.updateVaultConfig(
+            address(sparkVaultUSDC),
+            false,
+            MIN_INTENT_ASSETS_USDC - 1,
+            MAX_INTENT_ASSETS_USDC + 1
+        );
 
         // Step 3: Relayer still fulfills existing request (it was valid at creation)
         assertEq(underlyingAsset.balanceOf(address(sparkVaultUSDC)), DEPOSIT_AMOUNT_USDC);
