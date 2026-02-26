@@ -20,8 +20,8 @@ interface ISavingsVaultIntents {
      */
     struct VaultConfig {
         bool    whitelisted;
-        uint256 minIntentAssets;
-        uint256 maxIntentAssets;
+        uint256 minIntentShares;
+        uint256 maxIntentShares;
     }
 
     /**
@@ -52,10 +52,10 @@ interface ISavingsVaultIntents {
     error InsufficientAllowance(uint256 requiredAllowance, uint256 currentAllowance);
 
     /// @dev Thrown when the request's asset value exceeds the vault's configured maximum.
-    error IntentAssetsAboveMax(uint256 maxAssets, uint256 assets);
+    error IntentSharesAboveMax(uint256 maxShares, uint256 shares);
 
     /// @dev Thrown when the request's asset value is below the vault's configured minimum.
-    error IntentAssetsBelowMin(uint256 minAssets, uint256 assets);
+    error IntentSharesBelowMin(uint256 minShares, uint256 shares);
 
     /// @dev Thrown when the admin address is the zero address.
     error InvalidAdminAddress();

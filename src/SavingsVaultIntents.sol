@@ -51,25 +51,25 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
     function updateVaultConfig(
         address vault,
         bool    whitelisted_,
-        uint256 minIntentAssets_,
-        uint256 maxIntentAssets_
+        uint256 minIntentShares_,
+        uint256 maxIntentShares_
     )
         external onlyRole(DEFAULT_ADMIN_ROLE)
     {
         require(vault != address(0), InvalidVaultAddress());
 
         require(
-            minIntentAssets_ < maxIntentAssets_,
-            InvalidIntentAmountBounds(minIntentAssets_, maxIntentAssets_)
+            minIntentShares_ < maxIntentShares_,
+            InvalidIntentAmountBounds(minIntentShares_, maxIntentShares_)
         );
 
         vaultConfig[vault] = VaultConfig({
             whitelisted     : whitelisted_,
-            minIntentAssets : minIntentAssets_,
-            maxIntentAssets : maxIntentAssets_
+            minIntentShares : minIntentShares_,
+            maxIntentShares : maxIntentShares_
         });
 
-        emit VaultConfigUpdated(vault, whitelisted_, minIntentAssets_, maxIntentAssets_);
+        emit VaultConfigUpdated(vault, whitelisted_, minIntentShares_, maxIntentShares_);
     }
 
     /**********************************************************************************************/
@@ -89,16 +89,14 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
         require(vaultConfig_.whitelisted, VaultNotWhitelisted());
         require(recipient != address(0),  InvalidRecipientAddress());
 
-        uint256 assets = IERC4626Like(vault).convertToAssets(shares);
-
         require(
-            assets >= vaultConfig_.minIntentAssets,
-            IntentAssetsBelowMin(vaultConfig_.minIntentAssets, assets)
+            shares >= vaultConfig_.minIntentShares,
+            IntentSharesBelowMin(vaultConfig_.minIntentShares, shares)
         );
 
         require(
-            assets <= vaultConfig_.maxIntentAssets,
-            IntentAssetsAboveMax(vaultConfig_.maxIntentAssets, assets)
+            shares <= vaultConfig_.maxIntentShares,
+            IntentSharesAboveMax(vaultConfig_.maxIntentShares, shares)
         );
 
         uint256 maxDeadline = block.timestamp + maxDeadlineDuration;

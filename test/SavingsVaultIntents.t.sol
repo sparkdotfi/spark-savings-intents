@@ -274,15 +274,14 @@ contract RequestTests is TestBase {
     }
 
     function test_request_intentAssetsBelowMinBoundary() external {
-        uint256 sharesAtMin    = sparkVaultUSDC.convertToShares(MIN_INTENT_ASSETS_USDC) + 1; // Rounding
+        uint256 sharesAtMin    = MIN_INTENT_ASSETS_USDC;
         uint256 sharesBelowMin = sharesAtMin - 1;
-        uint256 assetsBelowMin = sparkVaultUSDC.convertToAssets(sharesBelowMin);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.IntentAssetsBelowMin.selector,
+                ISavingsVaultIntents.IntentSharesBelowMin.selector,
                 MIN_INTENT_ASSETS_USDC,
-                assetsBelowMin
+                sharesBelowMin
             )
         );
 
@@ -304,17 +303,16 @@ contract RequestTests is TestBase {
     }
 
     function test_request_intentAssetsAboveMaxBoundary() external {
-        uint256 sharesAtMax    = sparkVaultUSDC.convertToShares(MAX_INTENT_ASSETS_USDC) + 1; // Rounding
-        uint256 sharesAboveMax = sharesAtMax + 1;
-        uint256 assetsAboveMax = sparkVaultUSDC.convertToAssets(sharesAboveMax);
+        uint256 sharesAtMax    = MAX_INTENT_ASSETS_USDC;
+        uint256 sharesAboveMax = MAX_INTENT_ASSETS_USDC + 1;
 
-        _depositToVault(user, sparkVaultUSDC, MAX_INTENT_ASSETS_USDC + 1);
+        _depositToVault(user, sparkVaultUSDC, 2 * MAX_INTENT_ASSETS_USDC);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                ISavingsVaultIntents.IntentAssetsAboveMax.selector,
+                ISavingsVaultIntents.IntentSharesAboveMax.selector,
                 MAX_INTENT_ASSETS_USDC,
-                assetsAboveMax
+                sharesAboveMax
             )
         );
 
