@@ -19,7 +19,7 @@ contract AdminHandler is HandlerBase {
         maxDeadline = _bound(maxDeadline, 1, 1 days);
 
         vm.startPrank(admin);
-        savingsVaultIntents.setMaxDeadline(maxDeadline);
+        savingsVaultIntents.setMaxDeadlineDuration(maxDeadline);
         vm.stopPrank();
     }
 

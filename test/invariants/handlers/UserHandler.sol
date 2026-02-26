@@ -42,7 +42,7 @@ contract UserHandler is HandlerBase {
     }
 
     function createRequest(uint256 assetAmount, uint32 userIndex, uint256 deadline) public {
-        deadline = _bound(deadline, block.timestamp + 1, block.timestamp + savingsVaultIntents.maxDeadline());
+        deadline = _bound(deadline, block.timestamp + 1, block.timestamp + savingsVaultIntents.maxDeadlineDuration());
 
         ( bool whitelisted, uint256 minIntentAssets, uint256 maxIntentAssets ) = savingsVaultIntents.vaultConfig(vault);
 
