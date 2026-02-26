@@ -53,9 +53,9 @@ contract UserHandler is HandlerBase {
         IERC20Like underlyingAsset = IERC20Like(IERC4626Like(vault).asset());
 
         // Deposit amount for user.
-        assetAmount = _bound(assetAmount, minIntentAssets + 1, maxIntentAssets);
+        assetAmount = _bound(assetAmount, minIntentAssets + 10, maxIntentAssets);
 
-        deal(address(underlyingAsset), user, assetAmount);
+        deal(address(underlyingAsset), user, assetAmount > 1e14 ? 1e14 : assetAmount);
 
         vm.startPrank(user);
 

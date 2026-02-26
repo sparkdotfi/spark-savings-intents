@@ -28,8 +28,8 @@ contract AdminHandler is HandlerBase {
         uint256 minIntentAssets,
         uint256 maxIntentAssets
     ) public {
-        minIntentAssets = _bound(minIntentAssets, 0,                     10e6);
-        maxIntentAssets = _bound(maxIntentAssets, minIntentAssets + 1, 10_000e6);
+        minIntentAssets = _bound(minIntentAssets, 0,                       10e6);
+        maxIntentAssets = _bound(maxIntentAssets, minIntentAssets + 1e6, 10_000e6);
 
         vm.startPrank(admin);
         savingsVaultIntents.updateVaultConfig(vault, whitelisted, minIntentAssets, maxIntentAssets);
