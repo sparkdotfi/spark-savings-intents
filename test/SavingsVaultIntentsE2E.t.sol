@@ -281,7 +281,7 @@ contract E2ETests is TestBase {
 
         // Step 2: Admin updates maxDeadline and minIntentShares
         vm.prank(admin);
-        savingsVaultIntents.setMaxDeadline(block.timestamp + 50);
+        savingsVaultIntents.setMaxDeadlineDuration(block.timestamp + 50);
 
         vm.prank(admin);
         savingsVaultIntents.updateVaultConfig(
