@@ -14,35 +14,38 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
 
     bytes32 public constant RELAYER = keccak256("RELAYER");
 
-    uint256 public maxDeadline;
+    uint256 public maxDeadlineDuration;
 
     mapping(address vault => VaultConfig config)   public vaultConfig;
     mapping(address vault => uint256 requestCount) public vaultRequestCount;
 
     mapping(address account => mapping(address vault => WithdrawRequest request)) public withdrawRequests;
 
-    constructor(address admin, address relayer, uint256 maxDeadline_) {
+    constructor(address admin, address relayer, uint256 maxDeadlineDuration_) {
         require(admin   != address(0), InvalidAdminAddress());
         require(relayer != address(0), InvalidRelayerAddress());
 
-        require(maxDeadline_ != 0, InvalidMaxDeadline());
+        require(maxDeadlineDuration_ != 0, InvalidMaxDeadlineDuration());
 
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(RELAYER,            relayer);
 
-        maxDeadline = maxDeadline_;
+        maxDeadlineDuration = maxDeadlineDuration_;
     }
 
     /**********************************************************************************************/
     /*** Admin functions                                                                        ***/
     /**********************************************************************************************/
 
-    function setMaxDeadline(uint256 maxDeadline_) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(maxDeadline_ != 0, InvalidMaxDeadline());
+    function setMaxDeadlineDuration(uint256 maxDeadlineDuration_)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        require(maxDeadlineDuration_ != 0, InvalidMaxDeadlineDuration());
 
-        maxDeadline = maxDeadline_;
+        maxDeadlineDuration = maxDeadlineDuration_;
 
-        emit MaxDeadlineUpdated(maxDeadline_);
+        emit MaxDeadlineDurationUpdated(maxDeadlineDuration_);
     }
 
     function updateVaultConfig(
@@ -98,8 +101,10 @@ contract SavingsVaultIntents is ISavingsVaultIntents, AccessControlEnumerable {
             IntentAssetsAboveMax(vaultConfig_.maxIntentAssets, assets)
         );
 
+        uint256 maxDeadline = block.timestamp + maxDeadlineDuration;
+
         require(
-            deadline > block.timestamp && deadline <= block.timestamp + maxDeadline,
+            deadline > block.timestamp && deadline <= maxDeadline,
             InvalidDeadline(maxDeadline, deadline)
         );
 

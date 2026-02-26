@@ -85,7 +85,7 @@ The `request()` function enforces the following checks. All must pass for a requ
 | Valid recipient | Recipient must not be `address(0)` | `InvalidRecipientAddress` |
 | Min intent assets | `convertToAssets(shares) >= minIntentAssets` | `IntentAssetsBelowMin` |
 | Max intent assets | `convertToAssets(shares) <= maxIntentAssets` | `IntentAssetsAboveMax` |
-| Valid deadline | `block.timestamp < deadline <= block.timestamp + maxDeadline` | `InvalidDeadline` |
+| Valid deadline | `block.timestamp < deadline <= block.timestamp + maxDeadlineDuration` | `InvalidDeadline` |
 | Sufficient shares | `vault.balanceOf(user) >= shares` | `InsufficientShares` |
 | Sufficient allowance | `vault.allowance(user, intentContract) >= shares` | `InsufficientAllowance` |
 
@@ -97,7 +97,7 @@ The contract uses OpenZeppelin's `AccessControlEnumerable` with two roles:
 
 The admin can perform the following configuration operations:
 
-- **`setMaxDeadline(uint256 maxDeadline_)`** - Updates the maximum allowed deadline duration. The deadline for any request must be at most `block.timestamp + maxDeadline` into the future. Cannot be set to zero.
+- **`setMaxDeadlineDuration(uint256 maxDeadlineDuration_)`** - Updates the maximum allowed deadline duration. The deadline for any request must be at most `block.timestamp + maxDeadlineDuration` into the future. Cannot be set to zero.
 
 - **`updateVaultConfig(address vault, bool whitelisted, uint256 minIntentAssets, uint256 maxIntentAssets)`** - Configures a vault's whitelist status and intent amount bounds. The `minIntentAssets` must be strictly less than `maxIntentAssets`. These bounds define the acceptable range for the underlying asset value of requested shares.
   - The min/max intent asset bounds exist because the intent system is designed to serve **large withdrawals** from Spark Savings Vaults. In production, these thresholds will be set to high values (e.g., millions of USDC) to ensure the system is used for its intended purpose.

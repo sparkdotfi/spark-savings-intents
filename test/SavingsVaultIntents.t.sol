@@ -22,8 +22,8 @@ contract ConstructorTests is TestBase {
         new SavingsVaultIntents(admin, address(0), 1 days);
     }
 
-    function test_constructor_invalidMaxDeadline() external {
-        vm.expectRevert(ISavingsVaultIntents.InvalidMaxDeadline.selector);
+    function test_constructor_invalidMaxDeadlineDuration() external {
+        vm.expectRevert(ISavingsVaultIntents.InvalidMaxDeadlineDuration.selector);
         new SavingsVaultIntents(admin, relayer, 0);
     }
 
@@ -34,9 +34,9 @@ contract ConstructorTests is TestBase {
         address relayer_ = makeAddr("relayer");
 
         SavingsVaultIntents intentInstance = new SavingsVaultIntents({
-            admin        : admin_,
-            relayer      : relayer_,
-            maxDeadline_ : 1 days
+            admin                : admin_,
+            relayer              : relayer_,
+            maxDeadlineDuration_ : 1 days
         });
 
         assertEq(intentInstance.hasRole(intentInstance.DEFAULT_ADMIN_ROLE(), admin_),   true);
@@ -45,16 +45,16 @@ contract ConstructorTests is TestBase {
         assertEq(intentInstance.getRoleMemberCount(intentInstance.DEFAULT_ADMIN_ROLE()), 1);
         assertEq(intentInstance.getRoleMemberCount(intentInstance.RELAYER()),            1);
 
-        assertEq(intentInstance.maxDeadline(), 1 days);
+        assertEq(intentInstance.maxDeadlineDuration(), 1 days);
     }
 
 }
 
-contract SetMaxDeadlineTests is TestBase {
+contract SetMaxDeadlineDurationTests is TestBase {
 
     // Failure tests
 
-    function test_setMaxDeadline_noAuth() external {
+    function test_setMaxDeadlineDuration_noAuth() external {
         vm.expectRevert(
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
@@ -64,27 +64,27 @@ contract SetMaxDeadlineTests is TestBase {
         );
 
         vm.prank(unauthorized);
-        savingsVaultIntents.setMaxDeadline(2 days);
+        savingsVaultIntents.setMaxDeadlineDuration(2 days);
     }
 
-    function test_setMaxDeadline_invalidMaxDeadline() external {
-        vm.expectRevert(ISavingsVaultIntents.InvalidMaxDeadline.selector);
+    function test_setMaxDeadlineDuration_invalidMaxDeadline() external {
+        vm.expectRevert(ISavingsVaultIntents.InvalidMaxDeadlineDuration.selector);
         vm.prank(admin);
-        savingsVaultIntents.setMaxDeadline(0);
+        savingsVaultIntents.setMaxDeadlineDuration(0);
     }
 
     // Success tests
 
-    function test_setMaxDeadline() external {
-        assertEq(savingsVaultIntents.maxDeadline(), 1 days);
+    function test_setMaxDeadlineDuration() external {
+        assertEq(savingsVaultIntents.maxDeadlineDuration(), 1 days);
 
         vm.expectEmit(address(savingsVaultIntents));
-        emit ISavingsVaultIntents.MaxDeadlineUpdated(2 days);
+        emit ISavingsVaultIntents.MaxDeadlineDurationUpdated(2 days);
 
         vm.prank(admin);
-        savingsVaultIntents.setMaxDeadline(2 days);
+        savingsVaultIntents.setMaxDeadlineDuration(2 days);
 
-        assertEq(savingsVaultIntents.maxDeadline(), 2 days);
+        assertEq(savingsVaultIntents.maxDeadlineDuration(), 2 days);
     }
 
 }
@@ -339,12 +339,12 @@ contract RequestTests is TestBase {
     }
 
     function test_request_invalidDeadlineBoundary_deadlineTooLow() external {
-        uint256 maxDeadline = savingsVaultIntents.maxDeadline();
+        uint256 maxDeadlineDuration = savingsVaultIntents.maxDeadlineDuration();
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.InvalidDeadline.selector,
-                maxDeadline,
+                block.timestamp + maxDeadlineDuration,
                 block.timestamp
             )
         );
@@ -367,13 +367,13 @@ contract RequestTests is TestBase {
     }
 
     function test_request_invalidDeadlineBoundary_deadlineTooHigh() external {
-        uint256 maxDeadline = savingsVaultIntents.maxDeadline();
+        uint256 maxDeadlineDuration = savingsVaultIntents.maxDeadlineDuration();
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 ISavingsVaultIntents.InvalidDeadline.selector,
-                maxDeadline,
-                block.timestamp + maxDeadline + 1
+                block.timestamp + maxDeadlineDuration,
+                block.timestamp + maxDeadlineDuration + 1
             )
         );
 
@@ -382,7 +382,7 @@ contract RequestTests is TestBase {
             vault     : address(sparkVaultUSDC),
             shares    : userSpUSDCShares,
             recipient : user,
-            deadline  : block.timestamp + maxDeadline + 1
+            deadline  : block.timestamp + maxDeadlineDuration + 1
         });
 
         vm.prank(user);
@@ -390,7 +390,7 @@ contract RequestTests is TestBase {
             vault     : address(sparkVaultUSDC),
             shares    : userSpUSDCShares,
             recipient : user,
-            deadline  : block.timestamp + maxDeadline
+            deadline  : block.timestamp + maxDeadlineDuration
         });
     }
 
