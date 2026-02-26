@@ -155,9 +155,9 @@ interface ISavingsVaultIntents {
     /**********************************************************************************************/
 
     /**
-     *  @dev   Sets the maximum allowed deadline for withdrawal requests.
-     *         This function can only called by accounts with DEFAULT_ADMIN_ROLE.
-     *  @param maxDeadline_ New maximum deadline value in seconds.
+     *  @dev   Sets the max allowed deadline offset from block.timestamp at request time.
+     *         This function can only be called by accounts with DEFAULT_ADMIN_ROLE.
+     *  @param maxDeadline_ New maximum deadline offset in seconds.
      */
     function setMaxDeadline(uint256 maxDeadline_) external;
 
