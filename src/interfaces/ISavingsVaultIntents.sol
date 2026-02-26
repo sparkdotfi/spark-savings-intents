@@ -60,11 +60,11 @@ interface ISavingsVaultIntents {
     /// @dev Thrown when the admin address is the zero address.
     error InvalidAdminAddress();
 
-    /// @dev Thrown when the deadline exceeds block.timestamp + maxDeadline.
+    /// @dev Thrown when the deadline exceeds block.timestamp + maxDeadlineDuration.
     error InvalidDeadline(uint256 maxDeadline, uint256 deadline);
 
     /// @dev Thrown when the max deadline offset is set to zero.
-    error InvalidMaxDeadline();
+    error InvalidMaxDeadlineDuration();
 
     /// @dev Thrown when the recipient address is the zero address.
     error InvalidRecipientAddress();
@@ -90,9 +90,9 @@ interface ISavingsVaultIntents {
 
     /**
      *  @dev   Emitted when the admin updates the maximum allowed deadline offset.
-     *  @param maxDeadline New maximum deadline offset in seconds.
+     *  @param maxDeadlineDuration New maximum deadline offset in seconds.
      */
-    event MaxDeadlineUpdated(uint256 indexed maxDeadline);
+    event MaxDeadlineDurationUpdated(uint256 indexed maxDeadlineDuration);
 
     /**
      *  @dev   Emitted when a user cancels their pending withdrawal request.
@@ -157,9 +157,9 @@ interface ISavingsVaultIntents {
     /**
      *  @dev   Sets the max allowed deadline offset from block.timestamp at request time.
      *         This function can only be called by accounts with DEFAULT_ADMIN_ROLE.
-     *  @param maxDeadline_ New maximum deadline offset in seconds.
+     *  @param maxDeadlineDuration_ New maximum deadline offset in seconds.
      */
-    function setMaxDeadline(uint256 maxDeadline_) external;
+    function setMaxDeadlineDuration(uint256 maxDeadlineDuration_) external;
 
     /**
      *  @dev   Updates the configuration for a given vault.
@@ -203,7 +203,7 @@ interface ISavingsVaultIntents {
      *  @param  shares    Number of vault shares to withdraw.
      *  @param  recipient Address that will receive the redeemed assets.
      *  @param  deadline  Timestamp after which the request expires. Must be strictly greater than 
-     *                    the current block timestamp and must not exceed block.timestamp + maxDeadline.
+     *                    the current block timestamp and must not exceed block.timestamp + maxDeadlineDuration.
      *  @return requestId Identifier assigned to the new request.
      */
     function request(
@@ -219,9 +219,9 @@ interface ISavingsVaultIntents {
 
     /**
      *  @dev    Returns the max time after a request is made that the deadline can be set to.
-     *  @return maxDeadline Maximum deadline offset from block.timestamp at request time, in seconds.
+     *  @return maxDeadlineDuration Maximum deadline offset from block.timestamp at request time, in seconds.
      */
-    function maxDeadline() external view returns (uint256 maxDeadline);
+    function maxDeadlineDuration() external view returns (uint256 maxDeadlineDuration);
 
     /**
      *  @dev    Returns the ACL role identifier used for the relayer.
