@@ -4,7 +4,7 @@ pragma solidity ^0.8.27;
 /**
  *  @title ISavingsVaultIntents
  *  @dev   Interface for managing intent-based withdrawal requests from spark savings vaults v2.
- *          Users submit withdrawal requests that a relayer fulfills offchain.
+ *         Users submit withdrawal requests that a relayer fulfills offchain.
  */
 interface ISavingsVaultIntents {
 
@@ -197,18 +197,12 @@ interface ISavingsVaultIntents {
     function fulfill(address account, address vault, uint256 requestId) external;
 
     /**
-     *  @dev    Returns the current maximum allowed deadline for withdrawal requests.
-     *  @return maxDeadline Maximum deadline value in seconds.
-     */
-    function maxDeadline() external view returns (uint256 maxDeadline);
-
-    /**
-     *  @dev   Creates a new withdrawal request for a given vault.
-     *         The caller must have approved this contract to transfer their vault shares.
-     *  @param vault     Address of the vault to withdraw from.
-     *  @param shares    Number of vault shares to withdraw.
-     *  @param recipient Address that will receive the redeemed assets.
-     *  @param deadline  Timestamp after which the request expires. Must be strictly greater than 
+     *  @dev    Creates a new withdrawal request for a given vault.
+     *          The caller must have approved this contract to transfer their vault shares.
+     *  @param  vault     Address of the vault to withdraw from.
+     *  @param  shares    Number of vault shares to withdraw.
+     *  @param  recipient Address that will receive the redeemed assets.
+     *  @param  deadline  Timestamp after which the request expires. Must be strictly greater than 
      *                    the current block timestamp and must not exceed block.timestamp + maxDeadline.
      *  @return requestId Identifier assigned to the new request.
      */
@@ -218,6 +212,16 @@ interface ISavingsVaultIntents {
         address recipient,
         uint256 deadline
     ) external returns (uint256 requestId);
+
+    /**********************************************************************************************/
+    /*** View functions                                                                         ***/
+    /**********************************************************************************************/
+
+    /**
+     *  @dev    Returns the max time after a request is made that the deadline can be set to.
+     *  @return maxDeadline Maximum deadline offset from block.timestamp at request time, in seconds.
+     */
+    function maxDeadline() external view returns (uint256 maxDeadline);
 
     /**
      *  @dev    Returns the ACL role identifier used for the relayer.
