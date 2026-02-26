@@ -60,10 +60,10 @@ interface ISavingsVaultIntents {
     /// @dev Thrown when the admin address is the zero address.
     error InvalidAdminAddress();
 
-    /// @dev Thrown when the requested deadline exceeds the allowed maximum deadline.
+    /// @dev Thrown when the deadline exceeds block.timestamp + maxDeadline.
     error InvalidDeadline(uint256 maxDeadline, uint256 deadline);
 
-    /// @dev Thrown when the max deadline is set to zero.
+    /// @dev Thrown when the max deadline offset is set to zero.
     error InvalidMaxDeadline();
 
     /// @dev Thrown when the recipient address is the zero address.
@@ -89,8 +89,8 @@ interface ISavingsVaultIntents {
     /**********************************************************************************************/
 
     /**
-     *  @dev   Emitted when the admin updates the maximum allowed deadline.
-     *  @param maxDeadline New maximum deadline value in seconds.
+     *  @dev   Emitted when the admin updates the maximum allowed deadline offset.
+     *  @param maxDeadline New maximum deadline offset in seconds.
      */
     event MaxDeadlineUpdated(uint256 indexed maxDeadline);
 
