@@ -16,17 +16,24 @@ contract AdminHandler is HandlerBase {
     function setMaxDeadline(
         uint256 maxDeadline
     ) public {
-        maxDeadline = _bound(maxDeadline, 1, type(uint256).max);
+        maxDeadline = _bound(maxDeadline, 1, 1 days);
 
-        vm.prank(admin);
+        vm.startPrank(admin);
         savingsVaultIntents.setMaxDeadline(maxDeadline);
+        vm.stopPrank();
     }
 
     function updateVaultConfig(
-        bool whitelisted
+        bool    whitelisted,
+        uint256 minIntentAssets,
+        uint256 maxIntentAssets
     ) public {
-        vm.prank(admin);
-        savingsVaultIntents.updateVaultConfig(vault, whitelisted, 0, type(uint256).max);
+        minIntentAssets = _bound(minIntentAssets, 0,                     10e6);
+        maxIntentAssets = _bound(maxIntentAssets, minIntentAssets + 1, 10_000e6);
+
+        vm.startPrank(admin);
+        savingsVaultIntents.updateVaultConfig(vault, whitelisted, minIntentAssets, maxIntentAssets);
+        vm.stopPrank();
     }
 
 }

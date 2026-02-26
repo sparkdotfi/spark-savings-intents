@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 pragma solidity ^0.8.25;
 
-import { Math } from "@openzeppelin/contracts/utils/math/Math.sol";
-
 import { HandlerBase } from "./HandlerBase.sol";
 
 import { console2 } from "forge-std/console2.sol";
@@ -11,7 +9,10 @@ interface IERC4626Like {
     function approve(address spender, uint256 amount) external returns (bool);
     function asset() external view returns (address);
     function convertToAssets(uint256 shares) external view returns (uint256 assets);
+    function convertToShares(uint256 assets) external view returns (uint256 shares);
     function deposit(uint256 assets, address receiver) external returns (uint256 shares);
+    function depositCap() external view returns (uint256);
+    function totalAssets() external view returns (uint256);
 }
 
 interface IERC20Like {
@@ -30,6 +31,7 @@ contract UserHandler is HandlerBase {
 
     constructor(address vault_, address savingsVaultIntents_, uint256 numUsers_) HandlerBase(vault_, savingsVaultIntents_) {
         numUsers = numUsers_;
+
         for (uint256 i = 0; i < numUsers_; i++) {
             users.push(makeAddr(string(abi.encodePacked("user", i))));
         }
@@ -40,34 +42,34 @@ contract UserHandler is HandlerBase {
     }
 
     function createRequest(uint256 assetAmount, uint32 userIndex, uint256 deadline) public {
-        deadline = _bound(deadline, block.timestamp, block.timestamp + savingsVaultIntents.maxDeadline() - 1);
+        deadline = _bound(deadline, block.timestamp + 1, block.timestamp + savingsVaultIntents.maxDeadline());
 
-        ( bool whitelisted,, ) = savingsVaultIntents.vaultConfig(vault);
+        ( bool whitelisted, uint256 minIntentAssets, uint256 maxIntentAssets ) = savingsVaultIntents.vaultConfig(vault);
 
-        if ( !whitelisted ) {
-            return;
-        }
+        if (!whitelisted) return;
 
         address user = _getRandomUser(userIndex);
 
         IERC20Like underlyingAsset = IERC20Like(IERC4626Like(vault).asset());
 
-        assetAmount = _bound(assetAmount, MIN_INTENT_ASSETS, MAX_INTENT_ASSETS);
+        // Deposit amount for user.
+        assetAmount = _bound(assetAmount, minIntentAssets + 1, maxIntentAssets);
 
         deal(address(underlyingAsset), user, assetAmount);
 
         vm.startPrank(user);
+
         underlyingAsset.approve(address(vault), assetAmount);
+
+        if (IERC4626Like(vault).depositCap() < IERC4626Like(vault).totalAssets() + assetAmount) return;
+        
         uint256 shares = IERC4626Like(vault).deposit(assetAmount, address(user));
+
         vm.stopPrank();
 
         // Approve savingsVaultIntents to spend shares
         vm.prank(user);
         IERC4626Like(vault).approve(address(savingsVaultIntents), shares);
-
-        console2.log("deadline", deadline);
-        console2.log("block.timestamp", block.timestamp);
-        console2.log("maxDeadline", savingsVaultIntents.maxDeadline());
 
         vm.prank(user);
         uint256 requestId = savingsVaultIntents.request({

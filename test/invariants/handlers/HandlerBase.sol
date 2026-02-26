@@ -24,7 +24,7 @@ contract HandlerBase is Test {
         savingsVaultIntents = SavingsVaultIntents(savingsVaultIntents_);
 
         MIN_INTENT_ASSETS = 100e6;
-        MAX_INTENT_ASSETS = 100_000_000e6;
+        MAX_INTENT_ASSETS = 100_000e6;
 
         relayer = savingsVaultIntents.getRoleMember(RELAYER_ROLE, 0);
     }
