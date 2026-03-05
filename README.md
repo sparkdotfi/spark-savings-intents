@@ -73,7 +73,7 @@ The `fulfill(account, vault, requestId)` function is restricted to accounts with
 4. Deletes the stored request
 5. Calls `vault.redeem(shares, recipient, account)`, redeeming the user's shares on their behalf (using the share allowance) and sending the underlying assets directly to the specified recipient
 
-The fulfillment is **atomic**: the intent contract never holds any shares or assets at any point during execution.
+The fulfillment is **atomic**: Fulfills are **all-or-nothing**, partial fills are not supported. The full share amount specified in the request is redeemed or the transaction reverts. The intent contract never holds any shares or assets at any point during execution.
 
 ### Request Creation Preconditions
 
