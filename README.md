@@ -23,11 +23,11 @@ The Savings Intent contract introduces an **intent-based withdrawal mechanism**.
 
 The system involves three actors:
 
-| Actor | Role |
-|---|---|
-| **User** | Holds vault shares and submits withdrawal intent requests |
-| **SavingsVaultIntents Contract** | Stores withdrawal requests and executes atomic redemptions on fulfillment |
-| **ALM Planner (Relayer)** | Off-chain system that monitors intent events, orchestrates vault liquidity, and calls `fulfill` |
+| Actor                            | Role                                                                                            |
+| -------------------------------- | ----------------------------------------------------------------------------------------------- |
+| **User**                         | Holds vault shares and submits withdrawal intent requests                                       |
+| **SavingsVaultIntents Contract** | Stores withdrawal requests and executes atomic redemptions on fulfillment                       |
+| **ALM Planner (Relayer)**        | Off-chain system that monitors intent events, orchestrates vault liquidity, and calls `fulfill` |
 
 ### User Flow
 
@@ -35,7 +35,7 @@ The system involves three actors:
 
 **Step-by-step flow (current implementation):**
 
-1. **Approve shares**:  User approves the SavingsVaultIntents contract to spend their vault shares via `vault.approve(intentContract, shares)`.
+1. **Approve shares**: User approves the SavingsVaultIntents contract to spend their vault shares via `vault.approve(intentContract, shares)`.
 2. **Create request**: User calls `request(vault, shares, recipient, deadline)` on the intent contract. The contract validates all preconditions and stores the `WithdrawRequest`.
 3. **Event emitted**: A `RequestCreated` event is emitted containing the account, vault, requestId, shares, recipient, and deadline.
 4. **Liquidity orchestration**: The ALM Planner monitors `RequestCreated` events. It orchestrates the required liquidity by instructing asset liquidation and transferring the proceeds into the Spark Vault so it has enough idle assets to cover the redemption.
@@ -57,7 +57,7 @@ A user can have **one active request per vault** simultaneously. Since requests 
 
 #### Overwriting a Request
 
-If a user calls `request()` for a vault where they already have an active request, the new request **overwrites** the previous one. A new `requestId` is assigned from the vault's incrementing counter. The old request is silently replaced.
+If a user calls `request()` for a vault where they already have an active request, the new request **overwrites** the previous one, even if the new request is for a smaller amount. A new `requestId` is assigned from the vault's incrementing counter. The old request is silently replaced, and is thus considered cancelled even if no `RequestCancelled` event is emitted. Further, if the planner is processing requests as FIFO, the new request will be at the end of the queue.
 
 #### Cancelling a Request
 
@@ -73,21 +73,21 @@ The `fulfill(account, vault, requestId)` function is restricted to accounts with
 4. Deletes the stored request
 5. Calls `vault.redeem(shares, recipient, account)`, redeeming the user's shares on their behalf (using the share allowance) and sending the underlying assets directly to the specified recipient
 
-The fulfillment is **atomic**: the intent contract never holds any shares or assets at any point during execution.
+The fulfillment is **atomic**: Fulfills are **all-or-nothing**, partial fills are not supported. The full share amount specified in the request is redeemed or the transaction reverts. The intent contract never holds any shares or assets at any point during execution.
 
 ### Request Creation Preconditions
 
 The `request()` function enforces the following checks. All must pass for a request to be created:
 
-| Check | Condition | Error |
-|---|---|---|
-| Vault whitelisted | Vault must be in the whitelist | `VaultNotWhitelisted` |
-| Valid recipient | Recipient must not be `address(0)` | `InvalidRecipientAddress` |
-| Min intent assets | `convertToAssets(shares) >= minIntentAssets` | `IntentAssetsBelowMin` |
-| Max intent assets | `convertToAssets(shares) <= maxIntentAssets` | `IntentAssetsAboveMax` |
-| Valid deadline | `block.timestamp < deadline <= block.timestamp + maxDeadlineDuration` | `InvalidDeadline` |
-| Sufficient shares | `vault.balanceOf(user) >= shares` | `InsufficientShares` |
-| Sufficient allowance | `vault.allowance(user, intentContract) >= shares` | `InsufficientAllowance` |
+| Check                | Condition                                                             | Error                     |
+| -------------------- | --------------------------------------------------------------------- | ------------------------- |
+| Vault whitelisted    | Vault must be in the whitelist                                        | `VaultNotWhitelisted`     |
+| Valid recipient      | Recipient must not be `address(0)`                                    | `InvalidRecipientAddress` |
+| Min intent assets    | `convertToAssets(shares) >= minIntentAssets`                          | `IntentAssetsBelowMin`    |
+| Max intent assets    | `convertToAssets(shares) <= maxIntentAssets`                          | `IntentAssetsAboveMax`    |
+| Valid deadline       | `block.timestamp < deadline <= block.timestamp + maxDeadlineDuration` | `InvalidDeadline`         |
+| Sufficient shares    | `vault.balanceOf(user) >= shares`                                     | `InsufficientShares`      |
+| Sufficient allowance | `vault.allowance(user, intentContract) >= shares`                     | `InsufficientAllowance`   |
 
 ## Roles & Access Control
 
@@ -100,7 +100,7 @@ The admin can perform the following configuration operations:
 - **`setMaxDeadlineDuration(uint256 maxDeadlineDuration_)`** - Updates the maximum allowed deadline duration. The deadline for any request must be at most `block.timestamp + maxDeadlineDuration` into the future. Cannot be set to zero.
 
 - **`updateVaultConfig(address vault, bool whitelisted, uint256 minIntentAssets, uint256 maxIntentAssets)`** - Configures a vault's whitelist status and intent amount bounds. The `minIntentAssets` must be strictly less than `maxIntentAssets`. These bounds define the acceptable range for the underlying asset value of requested shares.
-  - The min/max intent asset bounds exist because the intent system is designed to serve **large withdrawals** from Spark Savings Vaults. In production, these thresholds will be set to high values (e.g., millions of USDC) to ensure the system is used for its intended purpose.
+    - The min/max intent asset bounds exist because the intent system is designed to serve **large withdrawals** from Spark Savings Vaults. In production, these thresholds will be set to high values (e.g., millions of USDC) to ensure the system is used for its intended purpose.
 
 ### RELAYER
 
@@ -142,6 +142,7 @@ The high `minIntentAssets` threshold makes spamming (creating requests then revo
 The `request()` function checks that the asset value of the requested shares falls within `[minIntentAssets, maxIntentAssets]` at request creation time. By the time the relayer calls `fulfill`, the asset value may have changed because Spark Vault share prices grow over time (the price per share is deterministic and always increases).
 
 **Why this is acceptable:**
+
 - The price change between request creation and fulfillment is very small in practice.
 - The share price only grows, so the asset value at fulfillment will be equal to or slightly higher than at request time.
 - Re-checking min/max bounds during `fulfill` is intentionally omitted to avoid unnecessary complexity.
@@ -152,6 +153,7 @@ The `request()` function checks that the asset value of the requested shares fal
 A race condition can occur when a user modifies their request while the relayer is about to fulfill the old one:
 
 **Scenario:**
+
 1. User creates request A with `requestId = 1` for their full share balance.
 2. User cancels request A (or overwrites it by creating a new request).
 3. User creates request B with `requestId = 2` for half their shares.
@@ -181,5 +183,6 @@ forge build
 forge test
 ```
 
-***
-*The IP in this repository was assigned to Mars SPC Limited in respect of the MarsOne SP*
+---
+
+_The IP in this repository was assigned to Mars SPC Limited in respect of the MarsOne SP_
