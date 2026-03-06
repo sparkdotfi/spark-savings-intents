@@ -1,0 +1,2 @@
+# Producton deployement
+deploy-mainnet-production-full :; ENV=production forge script script/Deploy.s.sol:DeployMainnetFull --sender ${ETH_FROM} --broadcast --verify

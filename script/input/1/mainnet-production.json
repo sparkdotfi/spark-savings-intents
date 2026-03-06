@@ -1,0 +1,5 @@
+{
+    "admin" : "0x3300f198988e4C9C63F75dF86De36421f06af8c4",
+    "relayer" : "0x8a25A24EDE9482C4Fc0738F99611BE58F1c839AB",
+    "maxDeadlineDuration" : "86400"
+}
