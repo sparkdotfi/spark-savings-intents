@@ -5,9 +5,9 @@ import { Script, stdJson, console } from "../lib/forge-std/src/Script.sol";
 
 import { ScriptTools } from "dss-test/ScriptTools.sol";
 
-import { Ethereum } from "../lib/spark-address-registry/src/Ethereum.sol";
-
+import { SavingsVaultIntents }       from "../src/SavingsVaultIntents.sol";
 import { SavingsVaultIntentsDeploy } from "../deploy/SavingsVaultIntentsDeploy.sol";
+import { SavingsVaultIntentsInit }   from "../deploy/SavingsVaultIntentsInit.sol";
 
 contract DeployMainnetFull is Script {
 
@@ -37,6 +37,91 @@ contract DeployMainnetFull is Script {
         console.log("SavingsVaultIntents deployed at : ", savingsVaultIntents);
 
         ScriptTools.exportContract(fileSlug, "savingsVaultIntents", savingsVaultIntents);
+
+        vm.stopBroadcast();
+    }
+
+}
+
+contract DeployStagingFull is Script {
+
+    using stdJson     for string;
+    using ScriptTools for string;
+
+    function run() external {
+        vm.setEnv("FOUNDRY_ROOT_CHAINID",             "1");
+        vm.setEnv("FOUNDRY_EXPORTS_OVERWRITE_LATEST", "true");
+
+        vm.createSelectFork(getChain("mainnet").rpcUrl);
+
+        console.log("Deploying Staging Mainnet SavingsVaultIntents..");
+
+        string memory fileSlug = string(abi.encodePacked("mainnet-", vm.envString("ENV")));
+        string memory config   = ScriptTools.loadConfig(fileSlug);
+
+        vm.startBroadcast();
+
+        address deployer = msg.sender;
+
+        // Step - 1 : Deploy with deployer as temporary admin
+
+        SavingsVaultIntents savingsVaultIntents = SavingsVaultIntents(
+            SavingsVaultIntentsDeploy.deployFull({
+                admin               : deployer,
+                relayer             : config.readAddress(".relayer"),
+                maxDeadlineDuration : config.readUint(".maxDeadlineDuration")
+            })
+        );
+
+        console.log("SavingsVaultIntents deployed at:", address(savingsVaultIntents));
+
+        // Step - 2 : Prepare init params
+
+        SavingsVaultIntentsInit.CheckDeployParams memory checkDeployParams =
+            SavingsVaultIntentsInit.CheckDeployParams(
+                deployer,
+                config.readAddress(".relayer"),
+                config.readUint(".maxDeadlineDuration")
+            );
+
+        uint256 numVaults = config.readUint(".numVaults");
+
+        SavingsVaultIntentsInit.ConfigVaultParams[] memory configVaultParams =
+            new SavingsVaultIntentsInit.ConfigVaultParams[](numVaults);
+
+        for (uint256 i; i < numVaults; ++i) {
+            string memory base = string(abi.encodePacked(".vaults[", vm.toString(i), "]"));
+
+            configVaultParams[i] = SavingsVaultIntentsInit.ConfigVaultParams({
+                vault           : config.readAddress(string(abi.encodePacked(base, ".vault"))),
+                whitelist       : config.readBool(string(abi.encodePacked(base, ".whitelist"))),
+                minIntentAssets : config.readUint(string(abi.encodePacked(base, ".minIntentAssets"))),
+                maxIntentAssets : config.readUint(string(abi.encodePacked(base, ".maxIntentAssets")))
+            });
+        }
+
+        // Step - 3 : Init SavingsVaultIntents
+
+        SavingsVaultIntentsInit.initSavingsVaultIntents(
+            address(savingsVaultIntents),
+            configVaultParams,
+            checkDeployParams
+        );
+
+        // Step - 4 : Transfer admin role to real admin and revoke from deployer
+
+        address admin = config.readAddress(".admin");
+
+        // Deployer == admin would leave the contract adminless after revoke
+        require(deployer != admin, "DeployStagingFull/deployer-must-differ-from-admin");
+
+        savingsVaultIntents.grantRole(savingsVaultIntents.DEFAULT_ADMIN_ROLE(), admin);
+
+        savingsVaultIntents.revokeRole(savingsVaultIntents.DEFAULT_ADMIN_ROLE(), deployer);
+
+        console.log("Admin role transferred to : ", admin);
+
+        ScriptTools.exportContract(fileSlug, "savingsVaultIntents", address(savingsVaultIntents));
 
         vm.stopBroadcast();
     }
