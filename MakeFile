@@ -1,0 +1,8 @@
+# Producton deployement
+deploy-mainnet-production-full :; ENV=production forge script script/Deploy.s.sol:DeployMainnetFull --sender ${ETH_FROM} --broadcast --verify
+
+# Staging deployement without init
+deploy-mainnet-staging-full-no-init :; ENV=staging forge script script/Deploy.s.sol:DeployMainnetFull --sender ${ETH_FROM} --broadcast --verify
+
+# Staging deployement with init
+deploy-mainnet-staging-full-with-init :; ENV=staging forge script script/Deploy.s.sol:DeployStagingFull --sender ${ETH_FROM} --broadcast --verify
