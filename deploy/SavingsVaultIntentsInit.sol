@@ -38,17 +38,24 @@ library SavingsVaultIntentsInit {
     {
         SavingsVaultIntents instance = SavingsVaultIntents(savingsVaultIntents);
 
-        // Step - 1 : Sanity checks
+        // Step 1: Sanity checks
 
-        require(instance.hasRole(DEFAULT_ADMIN_ROLE, checkDeployParams.admin),   "SavingsVaultIntentsInit/incorrect-admin");
-        require(instance.hasRole(RELAYER,            checkDeployParams.relayer), "SavingsVaultIntentsInit/incorrect-relayer");
+        require(
+            instance.hasRole(DEFAULT_ADMIN_ROLE, checkDeployParams.admin),
+            "SavingsVaultIntentsInit/incorrect-admin"
+        );
+
+        require(
+            instance.hasRole(RELAYER, checkDeployParams.relayer),
+            "SavingsVaultIntentsInit/incorrect-relayer"
+        );
 
         require(
             instance.maxDeadlineDuration() == checkDeployParams.maxDeadlineDuration,
             "SavingsVaultIntentsInit/incorrect-max-deadline-duration"
         );
 
-        // Step - 2 : Whitelist vaults with configs
+        // Step 2: Whitelist vaults with configs
 
         for (uint256 i; i < configVaultParams.length; ++i) {
             instance.updateVaultConfig({

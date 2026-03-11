@@ -43,7 +43,7 @@ contract SavingsVaultIntentsInitTests is TestBase {
 
         uint256 maxDeadlineDuration = 1 days;
 
-        // Step - 1 : Deploy SavingsIntentvault contract
+        // Step 1: Deploy SavingsIntentvault contract
 
         address intentsInstance = SavingsVaultIntentsDeploy.deployFull(
             admin,
@@ -51,7 +51,7 @@ contract SavingsVaultIntentsInitTests is TestBase {
             maxDeadlineDuration
         );
 
-        // Step - 2 : Prepare init params
+        // Step 2: Prepare init params
 
         SavingsVaultIntentsInit.CheckDeployParams memory checkDeployParams = 
             SavingsVaultIntentsInit.CheckDeployParams(admin, relayer, maxDeadlineDuration);
@@ -59,21 +59,21 @@ contract SavingsVaultIntentsInitTests is TestBase {
         SavingsVaultIntentsInit.ConfigVaultParams[] memory configVaultParams =
             new SavingsVaultIntentsInit.ConfigVaultParams[](2);
 
-        configVaultParams[0] = SavingsVaultIntentsInit.ConfigVaultParams ({
+        configVaultParams[0] = SavingsVaultIntentsInit.ConfigVaultParams({
             vault           : address(sparkVaultUSDC),
             whitelist       : true,
             minIntentAssets : MIN_INTENT_ASSETS_USDC,
             maxIntentAssets : MAX_INTENT_ASSETS_USDC
         });
 
-        configVaultParams[1] = SavingsVaultIntentsInit.ConfigVaultParams ({
+        configVaultParams[1] = SavingsVaultIntentsInit.ConfigVaultParams({
             vault           : address(sparkVaultETH),
             whitelist       : true,
             minIntentAssets : MIN_INTENT_ASSETS_ETH,
             maxIntentAssets : MAX_INTENT_ASSETS_ETH
         });
 
-        // Step - 3 : Init SavingsIntentVault contract
+        // Step 3: Init SavingsIntentVault contract
         vm.startPrank(admin);
 
         SavingsVaultIntentsInit.initSavingsVaultIntents(
@@ -84,7 +84,7 @@ contract SavingsVaultIntentsInitTests is TestBase {
         
         vm.stopPrank();
 
-        // Step - 4 : Assert init values
+        // Step 4: Assert init values
 
         (
             bool    whitelisted,

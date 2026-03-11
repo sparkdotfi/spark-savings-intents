@@ -63,7 +63,7 @@ contract DeployStagingFull is Script {
 
         address deployer = msg.sender;
 
-        // Step - 1 : Deploy with deployer as temporary admin
+        // Step 1: Deploy with deployer as temporary admin
 
         SavingsVaultIntents savingsVaultIntents = SavingsVaultIntents(
             SavingsVaultIntentsDeploy.deployFull({
@@ -75,7 +75,7 @@ contract DeployStagingFull is Script {
 
         console.log("SavingsVaultIntents deployed at:", address(savingsVaultIntents));
 
-        // Step - 2 : Prepare init params
+        // Step 2: Prepare init params
 
         SavingsVaultIntentsInit.CheckDeployParams memory checkDeployParams =
             SavingsVaultIntentsInit.CheckDeployParams(
@@ -100,7 +100,7 @@ contract DeployStagingFull is Script {
             });
         }
 
-        // Step - 3 : Init SavingsVaultIntents
+        // Step 3: Init SavingsVaultIntents
 
         SavingsVaultIntentsInit.initSavingsVaultIntents(
             address(savingsVaultIntents),
@@ -108,7 +108,7 @@ contract DeployStagingFull is Script {
             checkDeployParams
         );
 
-        // Step - 4 : Transfer admin role to real admin and revoke from deployer
+        // Step 4: Transfer admin role to real admin and revoke from deployer
 
         address admin = config.readAddress(".admin");
 
