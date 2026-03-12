@@ -13,5 +13,13 @@ fs_permissions = [
 [fuzz]
 runs = 1000
 
+[invariant]
+runs             = 30
+depth            = 100
+fail_on_revert   = true
+shrink_run_limit = 50
+show_metrics     = true
+show_solidity    = true
+
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
 
