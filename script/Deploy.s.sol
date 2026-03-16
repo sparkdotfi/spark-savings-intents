@@ -27,40 +27,6 @@ contract DeployMainnetFull is Script {
 
         vm.startBroadcast();
 
-        // Deploy the SavingsVaultIntents contract
-        address savingsVaultIntents = SavingsVaultIntentsDeploy.deployFull({
-            admin               : config.readAddress(".admin"),
-            relayer             : config.readAddress(".relayer"),
-            maxDeadlineDuration : config.readUint(".maxDeadlineDuration")
-        });
-
-        console.log("SavingsVaultIntents deployed at : ", savingsVaultIntents);
-
-        ScriptTools.exportContract(fileSlug, "savingsVaultIntents", savingsVaultIntents);
-
-        vm.stopBroadcast();
-    }
-
-}
-
-contract DeployStagingFull is Script {
-
-    using stdJson     for string;
-    using ScriptTools for string;
-
-    function run() external {
-        vm.setEnv("FOUNDRY_ROOT_CHAINID",             "1");
-        vm.setEnv("FOUNDRY_EXPORTS_OVERWRITE_LATEST", "true");
-
-        vm.createSelectFork(getChain("mainnet").rpcUrl);
-
-        console.log("Deploying Staging Mainnet SavingsVaultIntents..");
-
-        string memory fileSlug = string(abi.encodePacked("mainnet-", vm.envString("ENV")));
-        string memory config   = ScriptTools.loadConfig(fileSlug);
-
-        vm.startBroadcast();
-
         address deployer = msg.sender;
 
         // Step 1: Deploy with deployer as temporary admin
@@ -73,7 +39,10 @@ contract DeployStagingFull is Script {
             })
         );
 
-        console.log("SavingsVaultIntents deployed at:", address(savingsVaultIntents));
+        console.log("SavingsVaultIntents deployed at : ", address(savingsVaultIntents));
+
+        ScriptTools.exportContract(fileSlug, "savingsVaultIntents", address(savingsVaultIntents));
+
 
         // Step 2: Prepare init params
 
@@ -113,7 +82,7 @@ contract DeployStagingFull is Script {
         address admin = config.readAddress(".admin");
 
         // Deployer == admin would leave the contract adminless after revoke
-        require(deployer != admin, "DeployStagingFull/deployer-must-differ-from-admin");
+        require(deployer != admin, "DeployMainnetFull/deployer-must-differ-from-admin");
 
         savingsVaultIntents.grantRole(savingsVaultIntents.DEFAULT_ADMIN_ROLE(), admin);
 
