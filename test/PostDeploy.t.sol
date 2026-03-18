@@ -142,7 +142,7 @@ contract PostDeployMainnetProductionTests is Test {
 
         // Init: VaultConfigUpdated for each vault
 
-        (uint256 minIntentAssets, uint256 maxIntentAssets) = abi.decode(
+        ( uint256 minIntentAssets, uint256 maxIntentAssets ) = abi.decode(
             vaultConfigUpdatedLogs[0].data,
             (uint256, uint256)
         );
@@ -153,7 +153,7 @@ contract PostDeployMainnetProductionTests is Test {
         assertEq(minIntentAssets,                                 5_000_000e6);
         assertEq(maxIntentAssets,                                 500_000_000e6);
 
-        (minIntentAssets, maxIntentAssets) = abi.decode(
+        ( minIntentAssets, maxIntentAssets ) = abi.decode(
             vaultConfigUpdatedLogs[1].data,
             (uint256, uint256)
         );
@@ -164,7 +164,7 @@ contract PostDeployMainnetProductionTests is Test {
         assertEq(minIntentAssets,                                 1_250e18);
         assertEq(maxIntentAssets,                                 250_000e18);
 
-        (minIntentAssets, maxIntentAssets) = abi.decode(
+        ( minIntentAssets, maxIntentAssets ) = abi.decode(
             vaultConfigUpdatedLogs[2].data,
             (uint256, uint256)
         );
@@ -175,7 +175,7 @@ contract PostDeployMainnetProductionTests is Test {
         assertEq(minIntentAssets,                                 5_000_000e6);
         assertEq(maxIntentAssets,                                 500_000_000e6);
 
-        (minIntentAssets, maxIntentAssets) = abi.decode(
+        ( minIntentAssets, maxIntentAssets ) = abi.decode(
             vaultConfigUpdatedLogs[3].data,
             (uint256, uint256)
         );
