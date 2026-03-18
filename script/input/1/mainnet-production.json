@@ -1,5 +1,36 @@
 {
-    "admin" : "0x3300f198988e4C9C63F75dF86De36421f06af8c4",
-    "relayer" : "0x8a25A24EDE9482C4Fc0738F99611BE58F1c839AB",
-    "maxDeadlineDuration" : "86400"
+    "admin"               : "0x3300f198988e4C9C63F75dF86De36421f06af8c4",
+    "relayer"             : "0x8a25A24EDE9482C4Fc0738F99611BE58F1c839AB",
+    "maxDeadlineDuration" : "604800",
+    "numVaults"           : "4",
+    "vaults" : [
+        {
+            "_info"           : "SPARK_VAULT_V2_SPUSDC | min: 5M USDC (5_000_000e6), max: 500M USDC (500_000_000e6)",
+            "vault"           : "0x28B3a8fb53B741A8Fd78c0fb9A6B2393d896a43d",
+            "whitelist"       : true,
+            "minIntentAssets" : "5000000000000",
+            "maxIntentAssets" : "500000000000000"
+        },
+        {
+            "_info"           : "SPARK_VAULT_V2_SPETH | min: 1250 ETH (1250e18), max: 250000 ETH (250_000e18)",
+            "vault"           : "0xfE6eb3b609a7C8352A241f7F3A21CEA4e9209B8f",
+            "whitelist"       : true,
+            "minIntentAssets" : "1250000000000000000000",
+            "maxIntentAssets" : "250000000000000000000000"
+        },
+        {
+            "_info"           : "SPARK_VAULT_V2_SPPYUSD | min: 5M PYUSD (5_000_000e6), max: 500M PYUSD (500_000_000e6)",
+            "vault"           : "0x80128DbB9f07b93DDE62A6daeadb69ED14a7D354",
+            "whitelist"       : true,
+            "minIntentAssets" : "5000000000000",
+            "maxIntentAssets" : "500000000000000"
+        },
+        {
+            "_info"           : "SPARK_VAULT_V2_SPUSDT | min: 5M USDT (5_000_000e6), max: 500M USDT (500_000_000e6)",
+            "vault"           : "0xe2e7a17dFf93280dec073C995595155283e3C372",
+            "whitelist"       : true,
+            "minIntentAssets" : "5000000000000",
+            "maxIntentAssets" : "500000000000000"
+        }
+    ]
 }
