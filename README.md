@@ -100,7 +100,7 @@ The admin can perform the following configuration operations:
 - **`setMaxDeadlineDuration(uint256 maxDeadlineDuration_)`** - Updates the maximum allowed deadline duration. The deadline for any request must be at most `block.timestamp + maxDeadlineDuration` into the future. Cannot be set to zero.
 
 - **`updateVaultConfig(address vault, bool whitelisted, uint256 minIntentAssets, uint256 maxIntentAssets)`** - Configures a vault's whitelist status and intent amount bounds. The `minIntentAssets` must be strictly less than `maxIntentAssets`. These bounds define the acceptable range for the underlying asset value of requested shares.
-    - The min/max intent asset bounds exist because the intent system is designed to serve **large withdrawals** from Spark Savings Vaults. In production, these thresholds will be set to high values (e.g., millions of USDC) to ensure the system is used for its intended purpose.
+  - The min/max intent asset bounds exist because the intent system is designed to serve **large withdrawals** from Spark Savings Vaults. In production, these thresholds will be set to high values (e.g., millions of USDC) to ensure the system is used for its intended purpose.
 
 ### RELAYER
 
@@ -185,4 +185,6 @@ forge test
 
 ---
 
-_The IP in this repository was assigned to Mars SPC Limited in respect of the MarsOne SP_
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/c83ef7e4-fae1-4c5c-8cff-99494ef75962" height="100"/>
+</p>
