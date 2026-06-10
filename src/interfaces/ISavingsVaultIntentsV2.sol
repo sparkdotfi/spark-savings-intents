@@ -6,32 +6,18 @@ import { ISavingsVaultIntents } from "./ISavingsVaultIntents.sol";
 interface ISavingsVaultIntentsV2 is ISavingsVaultIntents {
 
     /**********************************************************************************************/
-    /*** Types                                                                                  ***/
-    /**********************************************************************************************/
-
-    enum VenueType { ERC4626, AAVE, PSM }
-
-    struct VenueConfig {
-        bool      whitelisted;
-        VenueType venueType;
-    }
-
-    /**********************************************************************************************/
     /*** Errors                                                                                 ***/
     /**********************************************************************************************/
 
-    error EmptyVenueOrder();
-    error InsufficientVenueLiquidity(uint256 required, uint256 available);
-    error InvalidAssetAddress();
+    error InsufficientATokenLiquidity(uint256 required, uint256 available);
+    error InvalidATokenAddress();
+    error InvalidATokenUnderlying();
     error InvalidMainnetControllerAddress();
-    error InvalidVenueAddress();
-    error VenueNotWhitelisted(address venue);
+    error VaultToATokenNotSet(address vault);
 
     /**********************************************************************************************/
     /*** Events                                                                                 ***/
     /**********************************************************************************************/
-
-    event DefaultVenueOrderUpdated(address indexed vault, address[] venues);
 
     event RequestPermissionlessFulfilled(
         address indexed account,
@@ -39,54 +25,18 @@ interface ISavingsVaultIntentsV2 is ISavingsVaultIntents {
         uint256 indexed requestId
     );
 
-    event VenueConfigUpdated(
-        address indexed asset,
-        address indexed venue,
-        bool            whitelisted,
-        uint8           venueType
-    );
+    event VaultToATokenSet(address indexed vault, address indexed aToken);
 
     /**********************************************************************************************/
     /*** Admin functions                                                                        ***/
     /**********************************************************************************************/
-    function setDefaultVenueOrder(address vault, address[] calldata venues) external;
-    
-    function updateVenueConfig(
-        address   asset,
-        address   venue,
-        bool      whitelisted_,
-        VenueType venueType_
-    ) external;
+
+    function setVaultToAToken(address vault, address aToken) external;
 
     /**********************************************************************************************/
     /*** External functions                                                                     ***/
     /**********************************************************************************************/
 
-    function permissionlessFulfill(
-        address account,
-        address vault,
-        uint256 requestId
-    ) external;
-
-    function permissionlessFulfill(
-        address   account,
-        address   vault,
-        uint256   requestId,
-        address[] calldata venues
-    ) external;
-
-    /**********************************************************************************************/
-    /*** View functions                                                                         ***/
-    /**********************************************************************************************/
-
-    function defaultVenueOrder(address vault, uint256 index) external view returns (address venue);
-
-    function venueConfig(
-        address asset,
-        address venue
-    )
-        external
-        view
-        returns (bool whitelisted, VenueType venueType);
+    function permissionlessFulfill(address vault, uint256 requestId) external;
 
 }
