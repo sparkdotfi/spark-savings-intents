@@ -7,6 +7,7 @@ import { VmSafe } from "../lib/forge-std/src/Vm.sol";
 import { IAccessControl } from "../lib/openzeppelin-contracts/contracts/access/IAccessControl.sol";
 
 import { Ethereum } from "../lib/spark-address-registry/src/Ethereum.sol";
+import { XLayer }   from "../lib/spark-address-registry/src/XLayer.sol";
 
 import { ISavingsVaultIntents } from "../src/interfaces/ISavingsVaultIntents.sol";
 import { SavingsVaultIntents }  from "../src/SavingsVaultIntents.sol";
@@ -127,7 +128,7 @@ contract PostDeployMainnetProductionTests is Test {
         assertEq(roleGrantedLogs[0].topics[1],             defaultAdminRole);
         assertEq(_toAddress(roleGrantedLogs[0].topics[2]), DEPLOYER);
         assertEq(_toAddress(roleGrantedLogs[0].topics[3]), DEPLOYER);
-        
+
         // Constructor: RoleGranted(RELAYER, RELAYER_ADDR, DEPLOYER)
         assertEq(roleGrantedLogs[1].topics[0],             IAccessControl.RoleGranted.selector);
         assertEq(roleGrantedLogs[1].topics[1],             relayerRole);
@@ -289,6 +290,61 @@ contract PostDeployMainnetProductionTests is Test {
         require(uint256(b) <= 1, "PostDeployMainnetProductionTests/to-bool-failed");
 
         return uint256(b) == uint256(1);
+    }
+
+}
+
+contract PostDeployXLayerProductionTests is Test {
+
+    address internal constant DEPLOYER = 0x23d43f3189Ab9CEBfFcC0352C0490387e3105FB3;
+
+    address internal constant SAVINGS_VAULT_INTENTS = 0x5bCD2f30FA1Bf675d5d6E793DAD7DdD487D21865;
+
+    address internal constant ADMIN   = XLayer.SPARK_EXECUTOR;
+    address internal constant RELAYER = XLayer.ALM_RELAYER_MULTISIG;
+
+    uint256 internal constant MAX_DEADLINE_DURATION = 7 days;
+
+    SavingsVaultIntents internal savingsVaultIntents;
+
+    function setUp() public {
+        vm.createSelectFork("https://rpc.xlayer.tech");
+
+        savingsVaultIntents = SavingsVaultIntents(SAVINGS_VAULT_INTENTS);
+    }
+
+    function test_postDeploy_xlayerProduction() external view {
+        // Deployer has no roles
+        assertEq(savingsVaultIntents.hasRole(savingsVaultIntents.DEFAULT_ADMIN_ROLE(), DEPLOYER), false);
+        assertEq(savingsVaultIntents.hasRole(savingsVaultIntents.RELAYER(),            DEPLOYER), false);
+
+        // Admin and Relayer roles added to ADMIN and RELAYER respectively
+        assertEq(savingsVaultIntents.hasRole(savingsVaultIntents.DEFAULT_ADMIN_ROLE(), ADMIN),   true);
+        assertEq(savingsVaultIntents.hasRole(savingsVaultIntents.RELAYER(),            RELAYER), true);
+
+        // Only one member per role
+        assertEq(savingsVaultIntents.getRoleMemberCount(savingsVaultIntents.DEFAULT_ADMIN_ROLE()), 1);
+        assertEq(savingsVaultIntents.getRoleMemberCount(savingsVaultIntents.RELAYER()),            1);
+
+        assertEq(savingsVaultIntents.maxDeadlineDuration(), MAX_DEADLINE_DURATION);
+
+        // Role admin hierarchy
+        assertEq(savingsVaultIntents.getRoleAdmin(savingsVaultIntents.RELAYER()), savingsVaultIntents.DEFAULT_ADMIN_ROLE());
+
+        // Vault configs
+
+        bool    whitelisted;
+        uint256 minIntentAssets;
+        uint256 maxIntentAssets;
+
+        // spUSDT
+        ( whitelisted, minIntentAssets, maxIntentAssets ) =
+            savingsVaultIntents.vaultConfig(XLayer.SPARK_VAULT_V2_SPUSDT);
+
+        assertEq(whitelisted,     true);
+        assertEq(minIntentAssets, 1_000_000e6);
+        assertEq(maxIntentAssets, 500_000_000e6);
+
     }
 
 }

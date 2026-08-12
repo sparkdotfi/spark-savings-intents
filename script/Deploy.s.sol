@@ -9,7 +9,7 @@ import { SavingsVaultIntents }       from "../src/SavingsVaultIntents.sol";
 import { SavingsVaultIntentsDeploy } from "../deploy/SavingsVaultIntentsDeploy.sol";
 import { SavingsVaultIntentsInit }   from "../deploy/SavingsVaultIntentsInit.sol";
 
-contract DeployMainnetFull is Script {
+contract DeployIntents is Script {
 
     using stdJson     for string;
     using ScriptTools for string;
@@ -24,7 +24,7 @@ contract DeployMainnetFull is Script {
 
         console.log("Deploying", chainName, "SavingsVaultIntents..");
 
-        vm.createSelectFork("https://rpc.xlayer.tech");
+        vm.createSelectFork(getChain(chainName).rpcUrl);
 
         vm.startBroadcast();
 
