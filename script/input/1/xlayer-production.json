@@ -1,0 +1,15 @@
+{
+    "admin"               : "0xCF5af6F53ceC74B791cb4182aC778ca9CD323510",
+    "relayer"             : "0x8a25A24EDE9482C4Fc0738F99611BE58F1c839AB",
+    "maxDeadlineDuration" : "604800",
+    "numVaults"           : "1",
+    "vaults" : [
+        {
+            "_info"           : "SPARK_VAULT_V2_SPUSDT | min: 1M USDT (1_000_000e6), max: 500M USDT (500_000_000e6)",
+            "vault"           : "0xc358c90D32375721Cb3924320Fdc2F8B694347Ca",
+            "whitelist"       : true,
+            "minIntentAssets" : "1000000000000",
+            "maxIntentAssets" : "500000000000000"
+        }
+    ]
+}

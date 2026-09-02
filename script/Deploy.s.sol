@@ -9,7 +9,7 @@ import { SavingsVaultIntents }       from "../src/SavingsVaultIntents.sol";
 import { SavingsVaultIntentsDeploy } from "../deploy/SavingsVaultIntentsDeploy.sol";
 import { SavingsVaultIntentsInit }   from "../deploy/SavingsVaultIntentsInit.sol";
 
-contract DeployMainnetFull is Script {
+contract DeployIntents is Script {
 
     using stdJson     for string;
     using ScriptTools for string;
@@ -18,12 +18,13 @@ contract DeployMainnetFull is Script {
         vm.setEnv("FOUNDRY_ROOT_CHAINID",             "1");
         vm.setEnv("FOUNDRY_EXPORTS_OVERWRITE_LATEST", "true");
 
-        vm.createSelectFork(getChain("mainnet").rpcUrl);
+        string memory chainName = vm.envString("CHAIN");
+        string memory fileSlug  = string(abi.encodePacked(chainName, "-", vm.envString("ENV")));
+        string memory config    = ScriptTools.loadConfig(fileSlug);
 
-        console.log("Deploying Mainnet SavingsVaultIntents..");
+        console.log("Deploying", chainName, "SavingsVaultIntents..");
 
-        string memory fileSlug = string(abi.encodePacked("mainnet-", vm.envString("ENV")));
-        string memory config   = ScriptTools.loadConfig(fileSlug);
+        vm.createSelectFork(getChain(chainName).rpcUrl);
 
         vm.startBroadcast();
 
@@ -42,7 +43,6 @@ contract DeployMainnetFull is Script {
         console.log("SavingsVaultIntents deployed at : ", address(savingsVaultIntents));
 
         ScriptTools.exportContract(fileSlug, "savingsVaultIntents", address(savingsVaultIntents));
-
 
         // Step 2: Prepare init params
 
