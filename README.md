@@ -183,6 +183,17 @@ forge build
 forge test
 ```
 
+## Audits
+
+Audit reports are hosted on the auditors' public portfolio pages:
+
+| Auditor | Report | Version | Date |
+| --- | --- | --- | --- |
+| ChainSecurity | [Spark Savings Intents](https://www.chainsecurity.com/security-audit/spark-savings-intents/) | v1.0.0 | 2026-03-11 |
+| Cantina | [Sky: Spark Saving Intents](https://cantina.xyz/portfolio/bb64c224-5874-4bd5-8f42-7dec572c2709) | v1.0.0 | 2026-03-10 |
+
+ChainSecurity reports are cumulative: each portfolio page hosts the latest version of the report, which covers all previously reviewed versions.
+
 ---
 
 <p align="center">
